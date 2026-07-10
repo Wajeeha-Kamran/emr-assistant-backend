@@ -5,8 +5,7 @@ from app.core.logging import setup_logging
 setup_logging()
 
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    title=settings.PROJECT_NAME
 )
 
 @app.get("/health")
