@@ -2,7 +2,7 @@
 
 ## PHASE 0 — Environment & Core Bootstrap
 - [x] Module 0.1 — FastAPI App Skeleton & Config Management
-- [ ] Module 0.2 — Database Connectivity (Two Logical Schemas)
+- [x] Module 0.2 — Database Connectivity (Two Logical Schemas)
 - [ ] Module 0.3 — Doctor Authentication & Authorization
 
 ## PHASE 1 — Consultation Session & Audio Capture
