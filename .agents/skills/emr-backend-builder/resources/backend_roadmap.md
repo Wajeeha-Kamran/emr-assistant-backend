@@ -4,6 +4,15 @@
 
 ---
 
+## Scope Note for This Build
+
+Two deliberate simplifications apply across every phase below, to keep the first pass lean:
+
+- **Minimal by default.** Each module implements only what its own checklist requires — no speculative config, unused dependencies, or scaffolding for future modules. Where a module description below mentions a heavier tool (Celery+Redis, for example), treat that as the *eventual* option, not the starting one — start with the simplest thing that satisfies the current module (FastAPI `BackgroundTasks`, `APScheduler`), and only upgrade if a later module (specifically Phase 8.3's load testing) proves it's genuinely needed.
+- **English-only audio, for now.** Whisper is used with `language="en"` explicitly set — no auto-detection, no multi-language handling. This keeps ASR and diarization simpler for the first working version. Multi-language support is a future add-on, not part of this roadmap.
+
+---
+
 ## How to Use This Document
 
 Work top to bottom. Part A gets your machine and repo ready. Part B and C tell you how to actually operate Antigravity and which AI model to reach for. Part E is the roadmap itself — one phase at a time, one module at a time, in order. Don't start Module N+1 until Module N's completion checklist is fully checked. Each module is scoped to be a single, reviewable unit of work — roughly what you'd hand to Antigravity as one task and one pull request.
@@ -387,9 +396,9 @@ Every phase below maps back to your own documentation, so you can cross-check ag
 *Maps to Sprint 2. Covers UC-06 and FR-02.*
 
 ### Module 2.1 — Whisper ASR Integration
-- **Objective:** Convert stored consultation audio into raw text via Whisper.
+- **Objective:** Convert stored consultation audio into raw text via Whisper, locked to English for this build.
 - **Why now:** First AI pipeline stage — everything downstream (diarization, SOAP, codes) depends on transcript text existing.
-- **Features:** A wrapper service that loads a Whisper model once (not per-request) and transcribes a given audio file; async/background execution so the request thread isn't blocked.
+- **Features:** A wrapper service that loads a Whisper model once (not per-request) and transcribes a given audio file with `language="en"` explicitly set (no auto-detection); async/background execution so the request thread isn't blocked.
 - **Files/folders:** `app/ml/whisper_engine.py`, `app/services/asr_service.py`
 - **Database changes:** None yet (transcript persistence comes in 2.3).
 - **API endpoints:** None directly — triggered internally by the stop-recording flow or a background worker.

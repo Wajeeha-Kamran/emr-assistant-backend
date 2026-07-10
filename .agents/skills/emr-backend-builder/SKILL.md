@@ -27,6 +27,20 @@ Never install or upgrade a system-level tool without checking first, and never d
 4. **Python packages:** before installing anything, check `requirements.txt` / `pip freeze` so nothing already present gets reinstalled or duplicated.
 5. If a check turns up a version that's close but slightly old, ask the user before upgrading rather than assuming it's fine to change.
 
+## Keep everything minimal — no speculative code
+Build exactly what the current module's checklist requires, nothing more.
+- Do not add dependencies, config options, environment variables, or settings fields that the current module doesn't actually use yet — even if a later module will need something similar. Add it when that module arrives, not before.
+- Do not scaffold folders, files, or stub functions for future modules ahead of time. Empty placeholders are clutter, not progress.
+- No dead code, no commented-out alternate implementations, no "just in case" try/except branches for situations that can't currently occur.
+- Prefer the simplest tool that satisfies the module's requirement. Concretely: use FastAPI's built-in `BackgroundTasks` instead of Celery+Redis until Phase 8.3 specifically requires true task-queue concurrency; use `APScheduler` instead of Celery for the Phase 7 retention job unless a later module proves it's insufficient. Don't introduce Redis, Celery, or other extra services before the roadmap actually calls for them.
+- If unsure whether something is in scope for the current module, leave it out and ask, rather than including it "to be safe."
+
+## Language scope — English-only for now
+This build only needs to handle English-language consultation audio.
+- Lock Whisper's transcription call to `language="en"` explicitly — do not rely on or build out auto-language-detection.
+- Do not add multi-language handling, language-selection config, or any i18n/l10n groundwork. This is a deliberate, temporary scope limit, not an oversight — leave a short code comment noting it's English-only by design so it's clear to anyone reading it later.
+- If multi-language support is wanted later, that's a new, explicitly-requested module — don't build toward it preemptively.
+
 ## Hardware-heavy steps — handle carefully
 Whisper, BioGPT, and ClinicalBERT are large ML models and can be slow or memory-hungry on an ordinary laptop.
 - Default to the smallest model checkpoint that works for development (e.g. Whisper `base` or `small`, not `large`).
