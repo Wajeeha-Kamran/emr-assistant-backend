@@ -69,3 +69,46 @@ def test_session_state_transitions(client):
     SessionManager.transition_state(db, session, SessionStatus.FINALIZED)
     assert session.status == SessionStatus.FINALIZED
     db.close()
+
+def test_start_recording(client):
+    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "pwd"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "pwd"})
+    token = login_resp.json()["access_token"]
+    
+    create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
+    session_id = create_resp.json()["id"]
+    
+    start_resp = client.post(f"/api/v1/sessions/{session_id}/start-recording", headers={"Authorization": f"Bearer {token}"})
+    assert start_resp.status_code == 200
+    assert start_resp.json()["status"] == "RECORDING"
+    assert start_resp.json()["started_at"] is not None
+
+def test_start_recording_conflict(client):
+    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "pwd"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "pwd"})
+    token = login_resp.json()["access_token"]
+    
+    create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
+    session_id = create_resp.json()["id"]
+    
+    start_resp = client.post(f"/api/v1/sessions/{session_id}/start-recording", headers={"Authorization": f"Bearer {token}"})
+    assert start_resp.status_code == 200
+    
+    conflict_resp = client.post(f"/api/v1/sessions/{session_id}/start-recording", headers={"Authorization": f"Bearer {token}"})
+    assert conflict_resp.status_code == 409
+    assert "Illegal state transition" in conflict_resp.json()["detail"]
+
+def test_start_recording_ownership(client):
+    client.post("/api/v1/auth/register", json={"email": "doc_other@example.com", "full_name": "Other Doc", "password": "pwd"})
+    login_other = client.post("/api/v1/auth/login", data={"username": "doc_other@example.com", "password": "pwd"})
+    token_other = login_other.json()["access_token"]
+    
+    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "pwd"})
+    login_start = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "pwd"})
+    token_start = login_start.json()["access_token"]
+    
+    create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token_start}"})
+    session_id = create_resp.json()["id"]
+    
+    not_found_resp = client.post(f"/api/v1/sessions/{session_id}/start-recording", headers={"Authorization": f"Bearer {token_other}"})
+    assert not_found_resp.status_code == 404

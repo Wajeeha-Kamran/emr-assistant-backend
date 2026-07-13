@@ -6,8 +6,8 @@
 - [x] Module 0.3 — Doctor Authentication & Authorization
 
 ## PHASE 1 — Consultation Session & Audio Capture
-- [ ] Module 1.1 — ConsultationSession Domain Model & Lifecycle
-- [ ] Module 1.2 — Start Recording Endpoint (UC-01)
+- [x] Module 1.1 — ConsultationSession Domain Model & Lifecycle
+- [x] Module 1.2 — Start Recording Endpoint (UC-01)
 - [ ] Module 1.3 — Stop Recording + Audio Handler (UC-02, FR-01)
 - [ ] Module 1.4 — Temporary Storage & Retention Policy Skeleton (UC-05, FR-08)
 

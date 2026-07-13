@@ -23,7 +23,9 @@ def cleanup_test_data():
                 "badpwd@example.com",
                 "me@example.com",
                 "doc_session@example.com",
-                "doc_state@example.com"
+                "doc_state@example.com",
+                "doc_start_rec@example.com",
+                "doc_other@example.com"
             ]
             doctors = db.query(Doctor).filter(Doctor.email.in_(test_emails)).all()
             doctor_ids = [doc.id for doc in doctors]
