@@ -9,8 +9,10 @@ def client():
     with TestClient(app) as c:
         yield c
 
+from app.models.session import ConsultationSession
+
 @pytest.fixture(autouse=True)
-def cleanup_test_doctors():
+def cleanup_test_data():
     def _clean():
         db = SessionLocal()
         try:
@@ -19,9 +21,16 @@ def cleanup_test_doctors():
                 "dup@example.com",
                 "login@example.com",
                 "badpwd@example.com",
-                "me@example.com"
+                "me@example.com",
+                "doc_session@example.com",
+                "doc_state@example.com"
             ]
-            db.query(Doctor).filter(Doctor.email.in_(test_emails)).delete(synchronize_session=False)
+            doctors = db.query(Doctor).filter(Doctor.email.in_(test_emails)).all()
+            doctor_ids = [doc.id for doc in doctors]
+            
+            if doctor_ids:
+                db.query(ConsultationSession).filter(ConsultationSession.doctor_id.in_(doctor_ids)).delete(synchronize_session=False)
+                db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).delete(synchronize_session=False)
             db.commit()
         finally:
             db.close()
