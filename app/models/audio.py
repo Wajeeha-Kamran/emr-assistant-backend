@@ -12,5 +12,7 @@ class AudioMetadata(Base):
     duration_seconds: Mapped[float] = mapped_column(Float, nullable=False)
     format: Mapped[str] = mapped_column(String, nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    retention_marked_for_deletion_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     session = relationship("ConsultationSession", back_populates="audio")

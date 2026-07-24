@@ -9,7 +9,7 @@
 - [x] Module 1.1 — ConsultationSession Domain Model & Lifecycle
 - [x] Module 1.2 — Start Recording Endpoint (UC-01)
 - [x] Module 1.3 — Stop Recording + Audio Handler (UC-02, FR-01)
-- [ ] Module 1.4 — Temporary Storage & Retention Policy Skeleton (UC-05, FR-08)
+- [x] Module 1.4 — Temporary Storage & Retention Policy Skeleton (UC-05, FR-08)
 
 ## PHASE 2 — ASR & Two-Role Diarization Pipeline
 - [ ] Module 2.1 — Whisper ASR Integration
