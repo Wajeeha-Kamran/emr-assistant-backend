@@ -11,6 +11,8 @@ def client():
 
 from app.models.session import ConsultationSession
 
+from app.models.audio import AudioMetadata
+
 @pytest.fixture(autouse=True)
 def cleanup_test_data():
     def _clean():
@@ -25,12 +27,20 @@ def cleanup_test_data():
                 "doc_session@example.com",
                 "doc_state@example.com",
                 "doc_start_rec@example.com",
-                "doc_other@example.com"
+                "doc_other@example.com",
+                "doc_audio@example.com",
+                "doc_audio_dur@example.com",
+                "doc_audio_type@example.com",
+                "doc_audio_state@example.com"
             ]
             doctors = db.query(Doctor).filter(Doctor.email.in_(test_emails)).all()
             doctor_ids = [doc.id for doc in doctors]
             
             if doctor_ids:
+                session_ids = [s.id for s in db.query(ConsultationSession.id).filter(ConsultationSession.doctor_id.in_(doctor_ids)).all()]
+                if session_ids:
+                    db.query(AudioMetadata).filter(AudioMetadata.session_id.in_(session_ids)).delete(synchronize_session=False)
+                    
                 db.query(ConsultationSession).filter(ConsultationSession.doctor_id.in_(doctor_ids)).delete(synchronize_session=False)
                 db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).delete(synchronize_session=False)
             db.commit()
@@ -40,3 +50,23 @@ def cleanup_test_data():
     _clean()
     yield
     _clean()
+
+import os
+import shutil
+from app.core.config import settings
+
+@pytest.fixture(autouse=True)
+def configure_test_storage():
+    original_storage = settings.AUDIO_STORAGE_DIR
+    test_storage = "./storage/test_audio"
+    settings.AUDIO_STORAGE_DIR = test_storage
+    
+    if os.path.exists(test_storage):
+        shutil.rmtree(test_storage)
+    os.makedirs(test_storage, exist_ok=True)
+    
+    yield
+    
+    if os.path.exists(test_storage):
+        shutil.rmtree(test_storage)
+    settings.AUDIO_STORAGE_DIR = original_storage

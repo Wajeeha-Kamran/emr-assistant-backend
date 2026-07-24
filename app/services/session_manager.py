@@ -15,7 +15,7 @@ class SessionManager:
         return db_session
 
     @staticmethod
-    def transition_state(db: Session, session: ConsultationSession, target_state: SessionStatus) -> ConsultationSession:
+    def transition_state(db: Session, session: ConsultationSession, target_state: SessionStatus, commit: bool = True) -> ConsultationSession:
         valid_transitions = {
             SessionStatus.INITIATED: [SessionStatus.RECORDING],
             SessionStatus.RECORDING: [SessionStatus.STOPPED],
@@ -36,6 +36,7 @@ class SessionManager:
         elif target_state == SessionStatus.FINALIZED:
             session.finalized_at = now
             
-        db.commit()
-        db.refresh(session)
+        if commit:
+            db.commit()
+            db.refresh(session)
         return session
