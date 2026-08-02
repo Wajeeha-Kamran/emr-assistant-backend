@@ -36,10 +36,14 @@ def test_transcribe_success():
     create_dummy_wav(wav_path, duration_sec=1.0)
     
     # Run the real Whisper service on it
-    text = ASRService.transcribe_audio(wav_path)
+    result = ASRService.transcribe_audio(wav_path)
     
-    # Should run successfully and return empty or minimal text (since it's silence)
-    assert isinstance(text, str)
+    # Should run successfully and return dict containing text and segments
+    assert isinstance(result, dict)
+    assert "text" in result
+    assert "segments" in result
+    assert isinstance(result["text"], str)
+    assert isinstance(result["segments"], list)
 
 def test_transcribe_corrupt_file():
     corrupt_path = os.path.join(TEST_AUDIO_DIR, "corrupt.wav")

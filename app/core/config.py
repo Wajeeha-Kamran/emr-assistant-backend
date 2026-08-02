@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     
     AUDIO_STORAGE_DIR: str = "./storage/audio"
     WHISPER_MODEL_NAME: str = "base.en"
+    DIARIZATION_PAUSE_THRESHOLD: float = 1.5
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
