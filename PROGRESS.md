@@ -12,7 +12,7 @@
 - [x] Module 1.4 — Temporary Storage & Retention Policy Skeleton (UC-05, FR-08)
 
 ## PHASE 2 — ASR & Two-Role Diarization Pipeline
-- [ ] Module 2.1 — Whisper ASR Integration
+- [x] Module 2.1 — Whisper ASR Integration
 - [ ] Module 2.2 — Two-Role Diarization (Doctor/Patient)
 - [ ] Module 2.3 — Transcript & TranscriptSegment Persistence + Finalization API
 - [ ] Module 2.4 — Riva-Ready Abstraction Layer
