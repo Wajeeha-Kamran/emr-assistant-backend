@@ -14,7 +14,7 @@
 ## PHASE 2 — ASR & Two-Role Diarization Pipeline
 - [x] Module 2.1 — Whisper ASR Integration
 - [x] Module 2.2 — Two-Role Diarization (Doctor/Patient)
-- [ ] Module 2.3 — Transcript & TranscriptSegment Persistence + Finalization API
+- [x] Module 2.3 — Transcript & TranscriptSegment Persistence + Finalization API
 - [x] Module 2.4 — Riva-Ready Abstraction Layer
 
 ## PHASE 3 — SOAP Note Draft Generation
