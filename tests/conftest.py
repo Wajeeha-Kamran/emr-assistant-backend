@@ -10,8 +10,8 @@ def client():
         yield c
 
 from app.models.session import ConsultationSession
-
 from app.models.audio import AudioMetadata
+from app.models.transcript import Transcript, TranscriptSegment
 
 @pytest.fixture(autouse=True)
 def cleanup_test_data():
@@ -40,6 +40,12 @@ def cleanup_test_data():
             if doctor_ids:
                 session_ids = [s.id for s in db.query(ConsultationSession.id).filter(ConsultationSession.doctor_id.in_(doctor_ids)).all()]
                 if session_ids:
+                    # Clean up transcripts and segments first (FK dependencies)
+                    transcript_ids = [t.id for t in db.query(Transcript.id).filter(Transcript.session_id.in_(session_ids)).all()]
+                    if transcript_ids:
+                        db.query(TranscriptSegment).filter(TranscriptSegment.transcript_id.in_(transcript_ids)).delete(synchronize_session=False)
+                        db.query(Transcript).filter(Transcript.id.in_(transcript_ids)).delete(synchronize_session=False)
+                    
                     db.query(AudioMetadata).filter(AudioMetadata.session_id.in_(session_ids)).delete(synchronize_session=False)
                     
                 db.query(ConsultationSession).filter(ConsultationSession.doctor_id.in_(doctor_ids)).delete(synchronize_session=False)

@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, status, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, status, HTTPException, File, UploadFile, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.api.deps import get_current_doctor
 from app.db.session import get_db
 from app.models.doctor import Doctor
 from app.models.session import ConsultationSession, SessionStatus
+from app.models.transcript import Transcript, TranscriptStatus
 from app.schemas.session import SessionResponse
 from app.services.session_manager import SessionManager
 from app.services.audio_manager import AudioManager
+from app.services.asr_service import ASRService
 
 router = APIRouter()
 
@@ -49,6 +51,7 @@ def start_recording(
 @router.post("/{session_id}/stop-recording", response_model=SessionResponse, status_code=status.HTTP_200_OK)
 def stop_recording(
     session_id: int,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor),
@@ -69,8 +72,16 @@ def stop_recording(
         audio_metadata = AudioManager.save_and_validate_audio(session_id, file)
         
         db.add(audio_metadata)
+        
+        # Initialize the transcript in 'processing' status
+        transcript = Transcript(session_id=session_id, status=TranscriptStatus.processing)
+        db.add(transcript)
+        
         db.commit()
         db.refresh(session)
+        
+        # Trigger background processing task
+        background_tasks.add_task(ASRService.transcribe_and_diarize, session_id)
         
     except ValueError as e:
         db.rollback()

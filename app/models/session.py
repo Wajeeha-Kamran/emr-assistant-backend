@@ -23,3 +23,4 @@ class ConsultationSession(Base):
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     audio = relationship("AudioMetadata", back_populates="session", uselist=False)
+    transcript = relationship("Transcript", back_populates="session", uselist=False)
