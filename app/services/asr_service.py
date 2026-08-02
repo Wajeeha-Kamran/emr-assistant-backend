@@ -1,6 +1,6 @@
 import logging
-from typing import Dict, List, Any
-from app.ml.whisper_engine import WhisperEngine
+from typing import Dict, Any
+from app.ml.engine_factory import get_asr_engine
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class ASRService:
         }
         Raises ASRError if transcription fails.
         """
-        engine = WhisperEngine.get_instance()
+        engine = get_asr_engine()
         result = engine.transcribe(audio_path)
         
         segments = []

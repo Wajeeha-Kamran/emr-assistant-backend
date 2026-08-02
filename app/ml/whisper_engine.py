@@ -2,10 +2,7 @@ import os
 import whisper
 import torch
 from app.core.config import settings
-
-class ASRError(Exception):
-    """Custom exception raised when ASR transcription fails."""
-    pass
+from app.ml.asr_engine import ASRError  # noqa: F401 — re-exported for backward compatibility
 
 class WhisperEngine:
     _instance = None
