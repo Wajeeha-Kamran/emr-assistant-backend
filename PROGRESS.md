@@ -20,7 +20,7 @@
 ## PHASE 3 — SOAP Note Draft Generation
 - [x] Module 3.1 — BioGPT Integration Service (revised: extractive-only via ClinicalBERT, BioGPT retained but not in critical path)
 - [x] Module 3.2 — SOAPNote & SOAPSection Data Model
-- [ ] Module 3.3 — SOAP Draft Generation API + Validation
+- [x] Module 3.3 — SOAP Draft Generation API + Validation
 
 ## PHASE 4 — ICD-10/CPT Code Suggestion Engine
 - [ ] Module 4.1 — Code Reference Data & Semantic Matching Setup

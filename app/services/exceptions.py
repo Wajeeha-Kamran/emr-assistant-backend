@@ -9,3 +9,7 @@ class SOAPValidationError(Exception):
 class SOAPNoteAlreadySignedError(Exception):
     """Raised when attempting to overwrite or regenerate a draft for a session whose note is already SIGNED."""
     pass
+
+class TranscriptNotReadyError(Exception):
+    """Raised when attempting to generate a SOAP note but the transcript is missing or not yet completed."""
+    pass

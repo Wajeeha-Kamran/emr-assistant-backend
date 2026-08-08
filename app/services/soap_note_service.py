@@ -4,7 +4,7 @@ from app.models.session import ConsultationSession
 from app.models.transcript import Transcript, TranscriptStatus, TranscriptSegment
 from app.models.soap_note import SOAPNote, SOAPSection, SOAPNoteStatus, SOAPSectionType
 from app.services.soap_service import SOAPService
-from app.services.exceptions import SessionNotFoundError, SOAPValidationError, SOAPNoteAlreadySignedError
+from app.services.exceptions import SessionNotFoundError, SOAPValidationError, SOAPNoteAlreadySignedError, TranscriptNotReadyError
 
 class SOAPNoteService:
     @staticmethod
@@ -21,7 +21,7 @@ class SOAPNoteService:
         # 2. Data Retrieval
         transcript = db.query(Transcript).filter(Transcript.session_id == session_id).first()
         if not transcript or transcript.status != TranscriptStatus.completed:
-            raise ValueError("Completed transcript not found for this session")
+            raise TranscriptNotReadyError("Completed transcript not found or not ready for this session")
 
         segments_db = db.query(TranscriptSegment).filter(
             TranscriptSegment.transcript_id == transcript.id

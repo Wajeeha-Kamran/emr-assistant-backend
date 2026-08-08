@@ -411,6 +411,9 @@ Every phase below maps back to your own documentation, so you can cross-check ag
   - [ ] Tests pass on synthetic audio
 
 ### Module 2.2 — Two-Role Diarization (Doctor/Patient)
+
+> **Revision note (discovered during Module 3.3 testing):** Real-world testing note: Manual end-to-end testing during Module 3.3 revealed that the pause-based diarization heuristic depends on Whisper producing a segment boundary at the actual speaker change — if Whisper merges both speakers' speech into one segment (common with short pauses or single-speaker test recordings), diarization cannot separate them, regardless of pause length. A pretrained audio-based alternative (pyannote.audio) would fix this properly but requires a substantial rework of this module plus Module 2.3's calling code. Decision: defer this evaluation to Module 9.1, where diarization accuracy will be measured against real recorded mock consultations (per the SRS's ≥85% diarization accuracy NFR) rather than decided reactively from a single adversarial test. If measured accuracy falls short, revisit the pyannote.audio upgrade at that point with real evidence.
+
 - **Objective:** Label transcript segments as `DOCTOR` or `PATIENT`, meeting the SRS's mandatory two-role diarization requirement.
 - **Why now:** SOAP generation and downstream review both depend on knowing who said what.
 - **Features:** A diarization service. For a genuine prototype, `pyannote.audio` gives real speaker-separation; a simpler, faster-to-build fallback is a turn-based heuristic (alternate speaker on pause-length thresholds) if you need to hit your sprint deadline first and refine accuracy later — document which one you chose and why, since the STD requires ≥85% labeling accuracy on your evaluation dataset.
@@ -725,7 +728,7 @@ Every phase below maps back to your own documentation, so you can cross-check ag
 *Formalizes your STD chapter across the whole backend.*
 
 ### Module 9.1 — Full pytest Suite Mapped to TC-01…TC-10
-- **Objective:** One coherent, CI-runnable test suite covering every test case in your STD, not just the ad-hoc tests written module-by-module.
+- **Objective:** One coherent, CI-runnable test suite covering every test case in your STD, not just the ad-hoc tests written module-by-module. Diarization accuracy specifically should be measured against a batch of real (or realistically simulated, two-speaker) mock consultation recordings — see the deferred decision noted in Module 2.2.
 - **Why now:** Consolidate and catch any gaps now that every use case has a working implementation.
 - **Features:** Organize `tests/unit/` and `tests/integration/` so each TC-ID maps to a named test function; shared fixtures for authenticated doctor, sample session, sample audio.
 - **Files/folders:** `tests/unit/`, `tests/integration/`, `tests/conftest.py`

@@ -34,7 +34,9 @@ def cleanup_test_data():
                 "doc_audio_type@example.com",
                 "doc_audio_state@example.com",
                 "doc_retention@example.com",
-                "doc_soap@example.com"
+                "doc_soap@example.com",
+                "doc_soap_api@example.com",
+                "doc_other_api@example.com"
             ]
             doctors = db.query(Doctor).filter(Doctor.email.in_(test_emails)).all()
             doctor_ids = [doc.id for doc in doctors]
