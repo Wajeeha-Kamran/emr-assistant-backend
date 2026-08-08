@@ -12,6 +12,7 @@ def client():
 from app.models.session import ConsultationSession
 from app.models.audio import AudioMetadata
 from app.models.transcript import Transcript, TranscriptSegment
+from app.models.soap_note import SOAPNote, SOAPSection
 
 @pytest.fixture(autouse=True)
 def cleanup_test_data():
@@ -32,7 +33,8 @@ def cleanup_test_data():
                 "doc_audio_dur@example.com",
                 "doc_audio_type@example.com",
                 "doc_audio_state@example.com",
-                "doc_retention@example.com"
+                "doc_retention@example.com",
+                "doc_soap@example.com"
             ]
             doctors = db.query(Doctor).filter(Doctor.email.in_(test_emails)).all()
             doctor_ids = [doc.id for doc in doctors]
@@ -47,6 +49,11 @@ def cleanup_test_data():
                         db.query(Transcript).filter(Transcript.id.in_(transcript_ids)).delete(synchronize_session=False)
                     
                     db.query(AudioMetadata).filter(AudioMetadata.session_id.in_(session_ids)).delete(synchronize_session=False)
+                    
+                    soap_note_ids = [n.id for n in db.query(SOAPNote.id).filter(SOAPNote.session_id.in_(session_ids)).all()]
+                    if soap_note_ids:
+                        db.query(SOAPSection).filter(SOAPSection.soap_note_id.in_(soap_note_ids)).delete(synchronize_session=False)
+                        db.query(SOAPNote).filter(SOAPNote.id.in_(soap_note_ids)).delete(synchronize_session=False)
                     
                 db.query(ConsultationSession).filter(ConsultationSession.doctor_id.in_(doctor_ids)).delete(synchronize_session=False)
                 db.query(Doctor).filter(Doctor.id.in_(doctor_ids)).delete(synchronize_session=False)
