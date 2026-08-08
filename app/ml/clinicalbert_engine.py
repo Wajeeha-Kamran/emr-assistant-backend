@@ -1,0 +1,197 @@
+import logging
+from typing import List, Dict, Any
+
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModel
+
+logger = logging.getLogger(__name__)
+
+class SOAPGenerationError(Exception):
+    """Custom exception raised when SOAP note generation or classification fails."""
+    pass
+
+# Hardcoded reference descriptions for zero-shot SOAP category classification.
+# Each category has 3 descriptions covering different angles of that section.
+REFERENCE_DESCRIPTIONS: Dict[str, List[str]] = {
+    "subjective": [
+        "Patient reports symptoms including pain, discomfort, and complaints.",
+        "The patient describes their medical history, allergies, and current medications.",
+        "Chief complaint and history of present illness as told by the patient.",
+    ],
+    "objective": [
+        "Physical examination findings including vital signs, temperature, blood pressure, and heart rate.",
+        "Laboratory results, imaging findings, and diagnostic test results.",
+        "Clinician observed signs during examination such as swelling, tenderness, and range of motion.",
+    ],
+    "assessment": [
+        "Clinical diagnosis, differential diagnosis, and medical impression.",
+        "Assessment of the patient condition based on subjective and objective findings.",
+        "Prognosis and severity evaluation of the identified condition.",
+    ],
+    "plan": [
+        "Treatment plan including prescribed medications and dosages.",
+        "Follow-up instructions, referrals, and recommended lifestyle changes.",
+        "Planned diagnostic tests, procedures, and patient education.",
+    ],
+}
+
+# Speaker-role bias: small additive bias toward expected categories.
+# Verified to change 1/12 classifications in diagnostic testing.
+SPEAKER_BIAS = 0.03
+
+SOAP_CATEGORIES = ["subjective", "objective", "assessment", "plan"]
+
+
+def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Cosine similarity via numpy (no scipy dependency)."""
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
+class ClinicalBERTEngine:
+    """
+    Singleton wrapper for emilyalsentzer/Bio_ClinicalBERT.
+
+    Provides embedding and zero-shot SOAP category classification via
+    cosine similarity against hardcoded reference descriptions.
+
+    Download size: ~436 MB (BERT-Base, 110M params).
+    """
+
+    _instance = None
+
+    def __init__(self) -> None:
+        if ClinicalBERTEngine._instance is not None:
+            raise RuntimeError("Use get_instance() to access ClinicalBERTEngine.")
+
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Initializing ClinicalBERTEngine using device: {self.device}")
+
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                "emilyalsentzer/Bio_ClinicalBERT"
+            )
+            self.model = AutoModel.from_pretrained(
+                "emilyalsentzer/Bio_ClinicalBERT"
+            ).to(self.device)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load ClinicalBERT model: {e}") from e
+
+        # Cache for reference description embeddings (computed lazily)
+        self._ref_embeddings: Dict[str, List[np.ndarray]] = {}
+
+    @classmethod
+    def get_instance(cls) -> "ClinicalBERTEngine":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def embed(self, text: str) -> np.ndarray:
+        """
+        Returns the [CLS] token embedding (768-dim) for a single text input.
+        """
+        inputs = self.tokenizer(
+            text, return_tensors="pt", truncation=True, max_length=128, padding=True
+        ).to(self.device)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+        return outputs.last_hidden_state[0, 0].cpu().numpy()
+
+    def embed_batch(self, texts: List[str]) -> List[np.ndarray]:
+        """Embed multiple texts. Returns a list of 768-dim numpy arrays."""
+        return [self.embed(text) for text in texts]
+
+    def _ensure_ref_embeddings(self) -> None:
+        """Pre-compute and cache reference description embeddings on first use."""
+        if self._ref_embeddings:
+            return
+        logger.info("Computing reference description embeddings (one-time)...")
+        for category, descriptions in REFERENCE_DESCRIPTIONS.items():
+            self._ref_embeddings[category] = self.embed_batch(descriptions)
+
+    def classify_segments(
+        self, segments: List[Dict[str, Any]]
+    ) -> Dict[str, List[str]]:
+        """
+        Classify transcript segments into SOAP categories using zero-shot
+        cosine similarity against reference descriptions.
+
+        Args:
+            segments: List of dicts with 'speaker_role' and 'text' keys.
+
+        Returns:
+            Dict mapping each category to a list of matched segment texts
+            (with speaker labels preserved, in original order).
+            Categories with no matches have empty lists.
+        """
+        self._ensure_ref_embeddings()
+
+        result: Dict[str, List[str]] = {cat: [] for cat in SOAP_CATEGORIES}
+
+        for segment in segments:
+            role = segment.get("speaker_role", "UNKNOWN")
+            text = segment.get("text", "").strip()
+            if not text:
+                continue
+
+            seg_emb = self.embed(text)
+
+            # Compute max similarity against each category's reference descriptions
+            max_sims: Dict[str, float] = {}
+            for cat in SOAP_CATEGORIES:
+                sims = [
+                    _cosine_similarity(seg_emb, ref_emb)
+                    for ref_emb in self._ref_embeddings[cat]
+                ]
+                max_sims[cat] = max(sims)
+
+            # Apply speaker-role bias
+            if role == "PATIENT":
+                max_sims["subjective"] += SPEAKER_BIAS
+            elif role == "DOCTOR":
+                max_sims["objective"] += SPEAKER_BIAS
+
+            # Argmax classification (no threshold — see anisotropy analysis)
+            best_cat = max(max_sims, key=max_sims.get)
+
+            # Preserve speaker label in the text for BioGPT context
+            labeled_text = f"{role}: {text}"
+            result[best_cat].append(labeled_text)
+
+        return result
+
+    def classify_doctor_segments(
+        self, segments: List[Dict[str, Any]]
+    ) -> Dict[str, List[str]]:
+        """
+        Classifies pre-filtered DOCTOR segments into objective, assessment, or plan.
+        Excludes subjective from the candidate categories.
+        Returns a dict mapping category to a list of stripped segment text strings.
+        """
+        self._ensure_ref_embeddings()
+        candidate_categories = ["objective", "assessment", "plan"]
+        result: Dict[str, List[str]] = {cat: [] for cat in candidate_categories}
+
+        for segment in segments:
+            # We assume these are already filtered for DOCTOR and non-empty
+            text = segment.get("text", "").strip()
+            if not text:
+                continue
+
+            seg_emb = self.embed(text)
+
+            max_sims: Dict[str, float] = {}
+            for cat in candidate_categories:
+                sims = [
+                    _cosine_similarity(seg_emb, ref_emb)
+                    for ref_emb in self._ref_embeddings[cat]
+                ]
+                max_sims[cat] = max(sims)
+
+            # Argmax classification restricted to the 3 categories
+            best_cat = max(max_sims, key=max_sims.get)
+
+            # Do not prepend speaker labels (formatting delegated to service)
+            result[best_cat].append(text)
+
+        return result

@@ -460,9 +460,31 @@ Every phase below maps back to your own documentation, so you can cross-check ag
 *Maps to Sprint 3. Covers UC-07 and FR-03.*
 
 ### Module 3.1 — BioGPT Integration Service
-- **Objective:** Turn a finalized transcript into a structured SOAP draft using BioGPT.
+
+> **Revision note (discovered during implementation):** Testing with real, varied transcripts showed that raw `microsoft/biogpt` (347M params) does not reliably use the input transcript at all — it exhibits strong few-shot copying bias, echoing the hardcoded prompt example almost verbatim regardless of what the patient actually said. This is a known limitation of small (sub-billion-parameter) language models, which generally lack reliable in-context learning ability. Confirmed with three distinct test transcripts (headache/nausea, sprained ankle, chest pain) — all three produced near-identical, wrong output.
+>
+> **Revised approach — hybrid extraction + constrained generation, modeled on published two-stage clinical summarization architectures (e.g. ClinicSum):** Rather than asking BioGPT to read a full transcript and decide what's relevant (a task it cannot reliably do at this scale), the pipeline now splits the job in two:
+> 1. **Extraction (ClinicalBERT):** Each transcript segment is embedded via ClinicalBERT and classified into a SOAP category (Subjective/Objective/Assessment/Plan) using zero-shot similarity against a small set of hardcoded reference descriptions per category — no fine-tuning, consistent with the minimalism rule. This surfaces the *actual patient/doctor words* relevant to each section.
+> 2. **Constrained generation (BioGPT):** BioGPT's role shrinks to rephrasing the already-extracted real content into clinical note language for each section — a much easier, more bounded task than free generation from a full transcript, since the content it works from is now directly relevant rather than distant/abstract.
+> 3. The existing fallback logic (Module 3.1's original design) is preserved: if a category has no matching segments (e.g. no Objective data from audio-only input), it falls back to `"Not documented in dialogue."` rather than fabricating content.
+>
+> **Roadmap impact:** This pulls the ClinicalBERT model/engine setup forward from Module 4.1 into Module 3.1. Module 4.1 (below) should **reuse and extend** the ClinicalBERT engine built here rather than re-integrating it from scratch — see the note on Module 4.1.
+>
+> **Residual known limitations (acceptable for prototype, must be documented):**
+> 1. **Cross-category misclassification:** Content that clearly belongs in one SOAP category can still be assigned to a different one by the zero-shot similarity classifier. Confirmed empirically: a segment containing explicit treatment/prescription instructions ("prescribe ibuprofen 400mg...schedule an X-ray") was classified as SUBJECTIVE rather than PLAN. The speaker-role bias (+0.03 toward OBJECTIVE for DOCTOR segments) does not fix this specific case because it only biases toward OBJECTIVE, not PLAN. Raw ClinicalBERT `[CLS]` embeddings suffer from well-documented anisotropy — all pairwise cosine similarities are compressed into the 0.63–0.89 range, making category boundaries inherently fuzzy. Classification relies on argmax (relative ranking), which is often correct but not reliably so for segments whose content spans multiple SOAP categories.
+> 2. **Non-clinical noise segments are not filtered:** Segments with no clinical content (greetings, small talk, e.g. "Hello, how are you? Please take a seat.") are still classified into a real SOAP category (in testing, the greeting was assigned to PLAN) and sent to BioGPT for rephrasing. This can produce odd or low-value output in that section. The pipeline does not apply a minimum similarity threshold to exclude noise, because the anisotropy issue makes any absolute threshold meaningless — even completely unrelated text scores >0.63 against all categories. Future improvement could add a separate noise-detection step or use mean-pooled embeddings with whitening to mitigate anisotropy.
+>
+> These are acceptable residual limitations for a prototype. The hybrid pipeline's primary job is to fix the catastrophic copying-bias failure (three different transcripts producing identical wrong output), not to achieve perfect section classification. Doctor review of the generated draft remains mandatory.
+
+> **Final revision — extractive-only pipeline (BioGPT removed from critical path):** Testing the hybrid pipeline's BioGPT rephrasing step with real transcripts showed it also failed to follow instructions. BioGPT performed autoregressive completion rather than rephrasing — confirmed output showed the model echoing the doctor's own greeting/question verbatim as the Subjective section content instead of summarizing patient-reported symptoms. Since the "rephrased" output was strictly worse than the raw extracted text, BioGPT was removed from `generate_draft`'s execution path entirely. The final design is purely extractive: PATIENT segments → SUBJECTIVE deterministically, DOCTOR segments → classified into OBJECTIVE/ASSESSMENT/PLAN via ClinicalBERT. Output text is the real transcript content with a deterministic prefix, guaranteeing every word is traceable to the actual dialogue.
+> 
+> **Noise segment force-classification limitation:** Doctor-spoken noise segments (e.g. doctor's greetings/fillers) are still force-classified into one of the three candidate doctor sections (Objective, Assessment, Plan) because no similarity threshold exists (anisotropy makes a static threshold impossible). Consequently, non-clinical speech from the doctor can occasionally pollute these sections. The Subjective section is now completely protected from doctor noise since it only extracts Patient segments.
+> 
+> **Casual assessment-phrasing misclassification:** Doctor assessment statements phrased conversationally (e.g. "This looks like a migraine" or "The ankle appears sprained, not fractured") are misclassified as OBJECTIVE rather than ASSESSMENT, confirmed by diagnostic scores (0.849 vs 0.770, and 0.840 vs 0.788 respectively). Only explicitly clinical-register phrasing ("Clinical diagnosis is...", "Prognosis is...") reliably lands in ASSESSMENT. Since real consultation speech is more likely to be casual than clinically formal, ASSESSMENT content may be under-represented in that section and appear in OBJECTIVE instead. This is acceptable for the prototype but should be flagged for improvement if assessment-section accuracy becomes a priority (e.g. richer reference descriptions, or a fine-tuned classifier).
+
+- **Objective:** Turn a finalized transcript into a structured SOAP draft using a purely extractive pipeline (PATIENT segments → Subjective, DOCTOR segments → ClinicalBERT classification).
 - **Why now:** This is the project's central value proposition — it can only start once a reliable transcript exists (Phase 2 done).
-- **Features:** A prompt/inference wrapper around BioGPT (via HuggingFace `transformers`) that takes transcript text and returns four labeled sections; model loaded once, run off the request thread.
+- **Features:** A ClinicalBERT engine wrapper for zero-shot segment classification into SOAP categories. The BioGPT engine is retained in the codebase but removed from the critical path. Both models loaded once, run off the request thread.
 - **Files/folders:** `app/ml/biogpt_engine.py`, `app/services/soap_generator.py`
 - **Database changes:** None yet.
 - **API endpoints:** None directly (internal pipeline stage, triggered after transcript finalization or on demand).
@@ -507,9 +529,12 @@ Every phase below maps back to your own documentation, so you can cross-check ag
 *Maps to Sprint 4. Covers UC-08 and FR-04.*
 
 ### Module 4.1 — Code Reference Data & Semantic Matching Setup
+
+> **Note:** If Module 3.1 was built with the hybrid extraction approach (see revision note there), a ClinicalBERT engine wrapper already exists at `app/ml/clinicalbert_engine.py`. Reuse and extend it here rather than integrating ClinicalBERT from scratch — this module only needs to add the ICD-10/CPT reference corpus and `pgvector` similarity search on top of the existing engine.
+
 - **Objective:** Load a reference set of ICD-10/CPT codes with descriptions and embeddings so suggestions can be matched semantically, not just by keyword.
 - **Why now:** You need a corpus to match against before you can generate any suggestions at all.
-- **Features:** A seed script that loads a (subset) ICD-10/CPT reference dataset into Postgres with `pgvector` embeddings (generated via ClinicalBERT); a lookup/similarity service.
+- **Features:** A seed script that loads a (subset) ICD-10/CPT reference dataset into Postgres with `pgvector` embeddings (generated via the existing ClinicalBERT engine); a lookup/similarity service.
 - **Files/folders:** `app/ml/clinicalbert_engine.py`, `scripts/seed_codes.py`
 - **Database changes:** New `code_reference` table (code, description, code_type enum `ICD10`/`CPT`, embedding vector column via `pgvector`).
 - **API endpoints:** None (internal reference data).

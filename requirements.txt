@@ -13,3 +13,5 @@ bcrypt==3.2.2
 python-multipart
 tinytag
 openai-whisper
+transformers
+sacremoses
