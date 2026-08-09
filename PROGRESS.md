@@ -23,7 +23,7 @@
 - [x] Module 3.3 — SOAP Draft Generation API + Validation
 
 ## PHASE 4 — ICD-10/CPT Code Suggestion Engine
-- [ ] Module 4.1 — Code Reference Data & Semantic Matching Setup
+- [x] Module 4.1 — Code Reference Data & Semantic Matching Setup
 - [ ] Module 4.2 — CodeSuggestion Service & Data Model
 - [ ] Module 4.3 — Code Suggestion API
 
