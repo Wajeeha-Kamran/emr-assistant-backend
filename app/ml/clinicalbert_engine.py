@@ -86,20 +86,47 @@ class ClinicalBERTEngine:
             cls._instance = cls()
         return cls._instance
 
+    def _mean_pooling(self, model_output, attention_mask) -> np.ndarray:
+        """Perform mean pooling on the token embeddings."""
+        token_embeddings = model_output.last_hidden_state
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+        # Sum embeddings across tokens
+        sum_embeddings = torch.sum(token_embeddings * input_mask_expanded, 1)
+        # Divide by sum of mask (clamped to avoid div by zero)
+        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        mean_pooled = sum_embeddings / sum_mask
+        
+        # L2 normalize
+        import torch.nn.functional as F
+        normalized = F.normalize(mean_pooled, p=2, dim=1)
+        return normalized.cpu().numpy()
+
     def embed(self, text: str) -> np.ndarray:
         """
-        Returns the [CLS] token embedding (768-dim) for a single text input.
+        Returns the mean-pooled, L2-normalized embedding (768-dim) for a single text input.
         """
         inputs = self.tokenizer(
             text, return_tensors="pt", truncation=True, max_length=128, padding=True
         ).to(self.device)
         with torch.no_grad():
             outputs = self.model(**inputs)
-        return outputs.last_hidden_state[0, 0].cpu().numpy()
+        
+        return self._mean_pooling(outputs, inputs['attention_mask'])[0]
 
     def embed_batch(self, texts: List[str]) -> List[np.ndarray]:
-        """Embed multiple texts. Returns a list of 768-dim numpy arrays."""
-        return [self.embed(text) for text in texts]
+        """Embed multiple texts using mean pooling. Returns a list of 768-dim numpy arrays."""
+        if not texts:
+            return []
+            
+        inputs = self.tokenizer(
+            texts, return_tensors="pt", truncation=True, max_length=128, padding=True
+        ).to(self.device)
+        
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            
+        batch_embeddings = self._mean_pooling(outputs, inputs['attention_mask'])
+        return [emb for emb in batch_embeddings]
 
     def _ensure_ref_embeddings(self) -> None:
         """Pre-compute and cache reference description embeddings on first use."""
