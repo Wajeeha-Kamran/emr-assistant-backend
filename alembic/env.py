@@ -13,6 +13,7 @@ from app.models.transcript import Transcript, TranscriptSegment
 from app.models.code_reference import CodeReference
 from app.models.code_suggestion import CodeSuggestion
 from app.models.soap_note import SOAPNote, SOAPSection
+from app.models.signature import Signature
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

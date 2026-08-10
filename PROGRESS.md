@@ -29,7 +29,7 @@
 
 ## PHASE 5 — Doctor Review, Edit, Approve & Sign Workflow
 - [x] Module 5.1 — Review & Edit API
-- [ ] Module 5.2 — Signature Model & Approve/Sign Endpoint
+- [x] Module 5.2 — Signature Model & Approve/Sign Endpoint
 
 ## PHASE 6 — EMR Synchronization
 - [ ] Module 6.1 — Simulated EMR Service
