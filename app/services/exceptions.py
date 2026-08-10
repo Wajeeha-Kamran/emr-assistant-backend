@@ -13,3 +13,7 @@ class SOAPNoteAlreadySignedError(Exception):
 class TranscriptNotReadyError(Exception):
     """Raised when attempting to generate a SOAP note but the transcript is missing or not yet completed."""
     pass
+
+class SOAPSectionNotFoundError(Exception):
+    """Raised when a specific SOAP section cannot be found for a note."""
+    pass

@@ -4,7 +4,7 @@ from app.models.session import ConsultationSession
 from app.models.transcript import Transcript, TranscriptStatus, TranscriptSegment
 from app.models.soap_note import SOAPNote, SOAPSection, SOAPNoteStatus, SOAPSectionType
 from app.services.soap_service import SOAPService
-from app.services.exceptions import SessionNotFoundError, SOAPValidationError, SOAPNoteAlreadySignedError, TranscriptNotReadyError
+from app.services.exceptions import SessionNotFoundError, SOAPValidationError, SOAPNoteAlreadySignedError, TranscriptNotReadyError, SOAPSectionNotFoundError
 
 class SOAPNoteService:
     @staticmethod
@@ -84,6 +84,31 @@ class SOAPNoteService:
             db.rollback()
             raise SOAPValidationError("Generated draft is missing required sections")
 
+        db.commit()
+        db.refresh(note)
+        return note
+
+    @staticmethod
+    def update_section(db: Session, note_id: int, section_id: int, new_content: str) -> SOAPNote:
+        note = db.query(SOAPNote).filter(SOAPNote.id == note_id).first()
+        if not note:
+            # We assume ownership is verified outside, so if it's missing here it's unexpected
+            raise ValueError("SOAP note not found")
+            
+        if note.status == SOAPNoteStatus.SIGNED:
+            raise SOAPNoteAlreadySignedError("Cannot edit a signed clinical record.")
+            
+        section = db.query(SOAPSection).filter(
+            SOAPSection.id == section_id,
+            SOAPSection.soap_note_id == note.id
+        ).first()
+        
+        if not section:
+            raise SOAPSectionNotFoundError("SOAP section not found or does not belong to this note")
+            
+        section.content = new_content
+        note.last_edited_at = datetime.now(timezone.utc)
+        
         db.commit()
         db.refresh(note)
         return note

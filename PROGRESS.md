@@ -28,7 +28,7 @@
 - [x] Module 4.3 — Code Suggestion API
 
 ## PHASE 5 — Doctor Review, Edit, Approve & Sign Workflow
-- [ ] Module 5.1 — Review & Edit API
+- [x] Module 5.1 — Review & Edit API
 - [ ] Module 5.2 — Signature Model & Approve/Sign Endpoint
 
 ## PHASE 6 — EMR Synchronization

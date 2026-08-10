@@ -19,3 +19,15 @@ class SOAPNoteResponse(BaseModel):
     sections: List[SOAPSectionResponse]
 
     model_config = ConfigDict(from_attributes=True)
+
+from pydantic import field_validator
+
+class SOAPSectionUpdateRequest(BaseModel):
+    content: str
+    
+    @field_validator('content')
+    @classmethod
+    def content_must_not_be_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("content cannot be empty or just whitespace")
+        return v

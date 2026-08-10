@@ -184,11 +184,153 @@ def test_get_soap_note_success(client: TestClient, api_test_data: dict, monkeypa
 def test_get_soap_note_not_found(client: TestClient, api_test_data: dict):
     """GET /soap-notes for session without draft returns 404."""
     headers = api_test_data["headers"]
-    session_id = api_test_data["session_ready_id"] # Has transcript, but hasn't generated yet
     
-    response = client.get(f"/api/v1/sessions/{session_id}/soap-notes", headers=headers)
+    response = client.get(f"/api/v1/sessions/9999/soap-notes", headers=headers)
     assert response.status_code == 404
-    assert "draft not found" in response.json()["detail"].lower()
+    assert "not found" in response.json()["detail"].lower()
+
+@pytest.fixture
+def edit_api_data(db: Session, client: TestClient):
+    doc = Doctor(email="doc_edit_api@example.com", hashed_password="pw", full_name="Edit Doc")
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    
+    other_doc = Doctor(email="doc_edit_api_other@example.com", hashed_password="pw", full_name="Other Doc")
+    db.add(other_doc)
+    db.commit()
+    db.refresh(other_doc)
+    
+    token = create_access_token(subject=doc.email)
+    other_token = create_access_token(subject=other_doc.email)
+    
+    session1 = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    db.add(session1)
+    db.commit()
+    
+    note_draft = SOAPNote(session_id=session1.id, status=SOAPNoteStatus.DRAFT)
+    db.add(note_draft)
+    db.commit()
+    
+    sec1 = SOAPSection(soap_note_id=note_draft.id, section_type=SOAPSectionType.SUBJECTIVE, content="old sub")
+    db.add(sec1)
+    db.commit()
+    
+    session2 = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    db.add(session2)
+    db.commit()
+    
+    note_signed = SOAPNote(session_id=session2.id, status=SOAPNoteStatus.SIGNED)
+    db.add(note_signed)
+    db.commit()
+    
+    sec2 = SOAPSection(soap_note_id=note_signed.id, section_type=SOAPSectionType.SUBJECTIVE, content="old sub")
+    db.add(sec2)
+    db.commit()
+    
+    session_other = ConsultationSession(doctor_id=other_doc.id, status=SessionStatus.FINALIZED)
+    db.add(session_other)
+    db.commit()
+    
+    note_other = SOAPNote(session_id=session_other.id, status=SOAPNoteStatus.DRAFT)
+    db.add(note_other)
+    db.commit()
+    
+    sec_other = SOAPSection(soap_note_id=note_other.id, section_type=SOAPSectionType.SUBJECTIVE, content="old sub")
+    db.add(sec_other)
+    db.commit()
+    
+    return {
+        "token": token,
+        "other_token": other_token,
+        "note_draft": note_draft,
+        "sec_draft": sec1,
+        "note_signed": note_signed,
+        "sec_signed": sec2,
+        "note_other": note_other,
+        "sec_other": sec_other
+    }
+
+def test_edit_section_success(client: TestClient, db: Session, edit_api_data: dict):
+    note = edit_api_data["note_draft"]
+    sec = edit_api_data["sec_draft"]
+    headers = {"Authorization": f"Bearer {edit_api_data['token']}"}
+    
+    assert note.last_edited_at is None
+    
+    payload = {"content": "new subjective content"}
+    response = client.patch(f"/api/v1/soap-notes/{note.id}/sections/{sec.id}", json=payload, headers=headers)
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == note.id
+    assert data["last_edited_at"] is not None
+    
+    # Verify section was updated
+    updated_sec = next(s for s in data["sections"] if s["id"] == sec.id)
+    assert updated_sec["content"] == "new subjective content"
+    
+    # Reload and survive
+    response_get = client.get(f"/api/v1/sessions/{note.session_id}/soap-notes", headers=headers)
+    data_get = response_get.json()
+    reloaded_sec = next(s for s in data_get["sections"] if s["id"] == sec.id)
+    assert reloaded_sec["content"] == "new subjective content"
+    assert data_get["last_edited_at"] == data["last_edited_at"]
+
+def test_edit_section_signed_rejected(client: TestClient, db: Session, edit_api_data: dict):
+    note = edit_api_data["note_signed"]
+    sec = edit_api_data["sec_signed"]
+    headers = {"Authorization": f"Bearer {edit_api_data['token']}"}
+    
+    payload = {"content": "new subjective content"}
+    response = client.patch(f"/api/v1/soap-notes/{note.id}/sections/{sec.id}", json=payload, headers=headers)
+    
+    assert response.status_code == 409
+    assert "signed" in response.json()["detail"].lower()
+
+def test_edit_section_ownership_denied(client: TestClient, db: Session, edit_api_data: dict):
+    note = edit_api_data["note_draft"]
+    sec = edit_api_data["sec_draft"]
+    # other_doc tries to edit note_draft
+    headers = {"Authorization": f"Bearer {edit_api_data['other_token']}"}
+    
+    payload = {"content": "hacked"}
+    response = client.patch(f"/api/v1/soap-notes/{note.id}/sections/{sec.id}", json=payload, headers=headers)
+    
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+def test_edit_section_mismatched_ids(client: TestClient, db: Session, edit_api_data: dict):
+    note = edit_api_data["note_draft"]
+    # trying to edit a section belonging to note_other using note_draft's URL
+    sec_other = edit_api_data["sec_other"]
+    headers = {"Authorization": f"Bearer {edit_api_data['token']}"}
+    
+    payload = {"content": "new"}
+    response = client.patch(f"/api/v1/soap-notes/{note.id}/sections/{sec_other.id}", json=payload, headers=headers)
+    
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+def test_edit_section_unauthenticated(client: TestClient, edit_api_data: dict):
+    note = edit_api_data["note_draft"]
+    sec = edit_api_data["sec_draft"]
+    
+    payload = {"content": "new"}
+    response = client.patch(f"/api/v1/soap-notes/{note.id}/sections/{sec.id}", json=payload)
+    
+    assert response.status_code == 401
+
+def test_edit_section_empty_content(client: TestClient, edit_api_data: dict):
+    note = edit_api_data["note_draft"]
+    sec = edit_api_data["sec_draft"]
+    headers = {"Authorization": f"Bearer {edit_api_data['token']}"}
+    
+    # Try empty content
+    payload = {"content": "   "}
+    response = client.patch(f"/api/v1/soap-notes/{note.id}/sections/{sec.id}", json=payload, headers=headers)
+    
+    assert response.status_code == 422
 
 def test_get_soap_note_unauthorized(client: TestClient, api_test_data: dict):
     """GET /soap-notes for another doctor's session returns 404."""

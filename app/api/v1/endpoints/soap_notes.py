@@ -5,11 +5,12 @@ from app.api.deps import get_db, get_current_doctor
 from app.models.doctor import Doctor
 from app.models.session import ConsultationSession
 from app.models.soap_note import SOAPNote
-from app.schemas.soap_note import SOAPNoteResponse
+from app.schemas.soap_note import SOAPNoteResponse, SOAPSectionUpdateRequest
 from app.services.soap_note_service import SOAPNoteService
-from app.services.exceptions import SessionNotFoundError, SOAPValidationError, SOAPNoteAlreadySignedError, TranscriptNotReadyError
+from app.services.exceptions import SessionNotFoundError, SOAPValidationError, SOAPNoteAlreadySignedError, TranscriptNotReadyError, SOAPSectionNotFoundError
 
 router = APIRouter()
+note_router = APIRouter()
 
 @router.post("/{session_id}/soap-notes/generate", response_model=SOAPNoteResponse, status_code=status.HTTP_201_CREATED)
 def generate_soap_note_draft(
@@ -55,3 +56,39 @@ def get_soap_note(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SOAP note draft not found for this session")
 
     return soap_note
+
+@note_router.patch("/{note_id}/sections/{section_id}", response_model=SOAPNoteResponse)
+def update_soap_section(
+    note_id: int,
+    section_id: int,
+    request: SOAPSectionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: Doctor = Depends(get_current_doctor)
+):
+    """
+    Updates a specific section of a SOAP note.
+    """
+    note = (
+        db.query(SOAPNote)
+        .join(ConsultationSession)
+        .filter(
+            SOAPNote.id == note_id,
+            ConsultationSession.doctor_id == current_user.id
+        )
+        .first()
+    )
+    if not note:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SOAP note not found"
+        )
+        
+    try:
+        updated_note = SOAPNoteService.update_section(db, note_id, section_id, request.content)
+        return updated_note
+    except SOAPNoteAlreadySignedError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    except SOAPSectionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
