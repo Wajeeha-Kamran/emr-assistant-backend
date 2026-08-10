@@ -4,7 +4,7 @@ from typing import List, Dict, Tuple
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.code_reference import CodeReference
+from app.models.code_reference import CodeReference, CodeType
 from app.ml.clinicalbert_engine import ClinicalBERTEngine
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class CodeReferenceService:
             return 0.0
         return float(np.dot(a, b) / (norm_a * norm_b))
 
-    def search_codes(self, text: str, top_k: int = 5) -> List[Tuple[CodeReference, float]]:
+    def search_codes(self, text: str, top_k: int = 5, code_type: CodeType = None) -> List[Tuple[CodeReference, float]]:
         """
         Search for the most semantically relevant codes for a given clinical text.
         Returns a list of tuples containing (CodeReference, similarity_score).
@@ -83,9 +83,11 @@ class CodeReferenceService:
         engine = ClinicalBERTEngine.get_instance()
         text_emb = engine.embed(text)
         
-        # Calculate similarity against all cached code embeddings
+        # Calculate similarity against cached code embeddings, optionally filtering by code_type
         scored_codes = []
         for code, code_emb in zip(self.codes, self.embeddings):
+            if code_type and code.code_type != code_type:
+                continue
             score = self._cosine_similarity(text_emb, code_emb)
             scored_codes.append((code, score))
             

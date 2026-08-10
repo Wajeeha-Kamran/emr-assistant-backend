@@ -29,6 +29,7 @@ class SOAPNote(Base):
 
     session = relationship("ConsultationSession")
     sections = relationship("SOAPSection", back_populates="note", cascade="all, delete-orphan")
+    suggestions = relationship("CodeSuggestion", back_populates="soap_note", cascade="all, delete-orphan")
 
 
 class SOAPSection(Base):

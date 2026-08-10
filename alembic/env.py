@@ -10,6 +10,9 @@ from app.models.doctor import Doctor
 from app.models.session import ConsultationSession
 from app.models.audio import AudioMetadata
 from app.models.transcript import Transcript, TranscriptSegment
+from app.models.code_reference import CodeReference
+from app.models.code_suggestion import CodeSuggestion
+from app.models.soap_note import SOAPNote, SOAPSection
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
