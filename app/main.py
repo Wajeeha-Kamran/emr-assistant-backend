@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.logging import setup_logging
 
-from app.api.v1.endpoints import auth, sessions, transcripts, soap_notes
+from app.api.v1.endpoints import auth, sessions, transcripts, soap_notes, code_suggestions
 
 setup_logging()
 
@@ -14,6 +14,7 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(sessions.router, prefix="/api/v1/sessions", tags=["sessions"])
 app.include_router(transcripts.router, prefix="/api/v1/sessions", tags=["transcripts"])
 app.include_router(soap_notes.router, prefix="/api/v1/sessions", tags=["soap_notes"])
+app.include_router(code_suggestions.router, prefix="/api/v1/soap-notes", tags=["code_suggestions"])
 
 @app.get("/health")
 def health_check():
