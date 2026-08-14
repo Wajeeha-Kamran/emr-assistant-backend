@@ -52,8 +52,36 @@ class SOAPService:
 
         try:
             classifier = ClinicalBERTEngine.get_instance()
-            classified_docs = classifier.classify_doctor_segments(doctor_segments)
+            
+            # Use concurrent.futures to enforce the NLP timeout budget
+            # Note: The underlying thread will continue if it times out, but the caller gets a timely error
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+            from app.core.metrics import metrics
+            
+            executor = ThreadPoolExecutor(max_workers=1)
+            try:
+                future = executor.submit(classifier.classify_doctor_segments, doctor_segments)
+                try:
+                    from app.core.config import settings
+                    classified_docs = future.result(timeout=settings.NLP_TIMEOUT_SECONDS)
+                    metrics.record_metric("soap_generation", True)
+                except FuturesTimeoutError:
+                    metrics.record_metric("soap_generation", False)
+                    from fastapi import HTTPException
+                    logger.warning("ClinicalBERT inference timed out. Underlying thread continues.")
+                    raise HTTPException(
+                        status_code=503, 
+                        detail="NLP Engine Timeout", 
+                        headers={"Retry-After": "5"}
+                    )
+            finally:
+                executor.shutdown(wait=False)
+                    
         except Exception as e:
+            from fastapi import HTTPException
+            if isinstance(e, HTTPException):
+                raise
+            metrics.record_metric("soap_generation", False)
             raise SOAPGenerationError(
                 f"Doctor segment classification failed: {e}"
             ) from e

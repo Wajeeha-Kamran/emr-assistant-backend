@@ -27,7 +27,7 @@ def db():
         db_session.close()
 
 def setup_mock_note(db: Session, doc: Doctor):
-    session = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    session = ConsultationSession(doctor_id=doc.id, status=SessionStatus.STOPPED)
     db.add(session)
     db.commit()
     

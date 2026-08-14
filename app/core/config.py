@@ -14,6 +14,19 @@ class Settings(BaseSettings):
     WHISPER_MODEL_NAME: str = "base.en"
     ASR_ENGINE: str = "whisper"          # Options: "whisper", "riva"
     DIARIZATION_PAUSE_THRESHOLD: float = 1.5
+    
+    # --- NFR Reconciliation: Robustness vs Efficiency ---
+    # The 5-second Robustness requirement governs how quickly a FAILURE is reported 
+    # to the caller. It is NOT a cap on how long successful processing may take 
+    # (the Efficiency NFR allows 15s-25s for SOAP generation under load). 
+    # Timeouts are runaway guards, sized above the performance budget.
+    NLP_TIMEOUT_SECONDS: int = 30
+    
+    # ASR is slower than real-time on CPU, and supports 30-minute recordings. 
+    # A fixed timeout would kill valid long transcriptions.
+    # Timeout is computed dynamically: max(FLOOR, duration * FACTOR)
+    ASR_TIMEOUT_FLOOR_SECONDS: int = 300
+    ASR_TIMEOUT_FACTOR: int = 6
 
     # Retention: audio is held for RETENTION_WINDOW_MINUTES after being flagged,
     # then deleted on the next sweep. Worst-case latency = window + interval.

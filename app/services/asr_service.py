@@ -62,11 +62,44 @@ class ASRService:
             if not transcript:
                 raise ValueError("Transcript record not found for session")
 
-            # 2. Run transcription
-            asr_result = ASRService.transcribe_audio(audio.file_path)
+            # 2. Run transcription with dynamic timeout
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+            from app.core.config import settings
+            from app.core.metrics import metrics
+            
+            duration = audio.duration_seconds or 0.0
+            timeout = max(
+                settings.ASR_TIMEOUT_FLOOR_SECONDS,
+                int(duration * settings.ASR_TIMEOUT_FACTOR)
+            )
+            logger.info(f"ASR timeout budget for session {session_id} (duration {duration}s) computed as {timeout}s")
+            
+            executor = ThreadPoolExecutor(max_workers=1)
+            try:
+                future = executor.submit(ASRService.transcribe_audio, audio.file_path)
+                try:
+                    asr_result = future.result(timeout=timeout)
+                    metrics.record_metric("asr", True)
+                except FuturesTimeoutError:
+                    metrics.record_metric("asr", False)
+                    logger.warning(f"ASR transcription for session {session_id} timed out after {timeout}s. Underlying thread continues.")
+                    # Note: Since this runs in a BackgroundTask, a timeout marks the transcript failed. 
+                    # The recovery path is the POST /transcripts/{session_id}/retry endpoint.
+                    raise TimeoutError(f"ASR computation exceeded budget of {timeout}s")
+                except Exception:
+                    metrics.record_metric("asr", False)
+                    raise
+            finally:
+                executor.shutdown(wait=False)
+
             
             # 3. Run diarization
-            diarized = DiarizationService.diarize_segments(asr_result.get("segments", []))
+            try:
+                diarized = DiarizationService.diarize_segments(asr_result.get("segments", []))
+                metrics.record_metric("diarization", True)
+            except Exception:
+                metrics.record_metric("diarization", False)
+                raise
             
             # 4. Clear any old segments (concurrency safety)
             db.query(TranscriptSegment).filter(TranscriptSegment.transcript_id == transcript.id).delete()

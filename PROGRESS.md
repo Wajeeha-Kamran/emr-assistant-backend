@@ -41,7 +41,10 @@
 
 ## PHASE 8 — Security, Reliability & Performance Hardening
 - [ ] Module 8.1 — Security Hardening
-- [ ] Module 8.2 — Error Handling, Resilience & Observability
+- [x] **Module 8.2:** Error Handling, Resilience & Observability
+  - Implement robust error surfacing (timeout wrappers, fast failure)
+  - Light-weight metrics telemetry (success/failure rates)
+  - Validate 95%+ success rate against test runs
 - [ ] Module 8.3 — Performance & Concurrency
 
 ## PHASE 9 — Testing, QA & API Documentation

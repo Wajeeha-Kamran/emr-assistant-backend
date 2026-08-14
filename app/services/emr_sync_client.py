@@ -8,6 +8,7 @@ from app.models.session import SessionStatus
 from app.core.config import settings
 from app.services.session_manager import SessionManager
 from app.services.retention_service import RetentionService
+from app.core.metrics import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -81,63 +82,62 @@ class EMRSyncClient:
                 }
             }
             
-            url = f"{settings.SIMULATED_EMR_URL}/simulated-emr/records"
             max_retries = 3
-            success = False
-            
-            for attempt in range(max_retries):
-                try:
-                    with httpx.Client(timeout=10.0) as client:
-                        response = client.post(url, json=payload)
-                        
-                        if response.is_error:
-                            if 400 <= response.status_code < 500:
-                                # Fail fast on 4xx
-                                logger.error(f"EMR sync 4xx error for note {note_id}: {response.status_code} - {response.text}")
-                                break
+            try:
+                with httpx.Client(timeout=10.0) as client:
+                    for attempt in range(1, max_retries + 1):
+                        try:
+                            response = client.post(
+                                f"{settings.SIMULATED_EMR_URL}/simulated-emr/records",
+                                json=payload
+                            )
                             
-                        response.raise_for_status()
-                        success = True
-                        break
-                except httpx.RequestError as e:
-                    logger.error(f"EMR sync request error for note {note_id}: {e}")
-                except httpx.HTTPStatusError as e:
-                    logger.error(f"EMR sync HTTP error for note {note_id}: {e}")
-                
-                if attempt < max_retries - 1:
-                    sleep_time = min(2 ** attempt, 10)  # Max backoff capped at 10s
-                    time.sleep(sleep_time)
-                    
-            if success:
-                note.sync_status = SyncStatus.SUCCESS
-                
-                # Close broken links: transition session STOPPED → FINALIZED via the
-                # state machine and flag audio for cleanup (retention timer starts now).
-                # Both use commit=False so everything lands in a single transaction.
-                try:
-                    if session.status == SessionStatus.STOPPED:
-                        SessionManager.transition_state(db, session, SessionStatus.FINALIZED, commit=False)
-                        RetentionService.mark_audio_for_cleanup(db, session.id, commit=False)
-                except Exception as e:
-                    # logger.error — if finalization fails, audio is never flagged and therefore
-                    # never deleted. This is a silent, permanent retention failure. It fails in the
-                    # safe direction (audio is kept), but it must be loud.
-                    logger.error(f"Post-sync finalization failed for note {note_id}: {e}")
-            else:
+                            if response.is_error:
+                                if 400 <= response.status_code < 500:
+                                    # Fail fast on 4xx
+                                    response_text_safe = response.text[:200] + "..." if len(response.text) > 200 else response.text
+                                    logger.error(f"EMR sync 4xx error for note {note_id}: {response.status_code} - {response_text_safe}")
+                                    break
+                                
+                            response.raise_for_status()
+                            
+                            # 4. Success -> Finalize session and note
+                            note.sync_status = SyncStatus.SUCCESS
+                            db.commit()
+                            
+                            # Transition session to FINALIZED, which also marks audio for cleanup
+                            try:
+                                SessionManager.transition_state(db, session, SessionStatus.FINALIZED)
+                                RetentionService.mark_audio_for_cleanup(db, session.id, commit=True)
+                            except Exception as e:
+                                # logger.error — if finalization fails, audio is never flagged and therefore
+                                # orphaned, but the sync itself succeeded and we don't want to report FAILED.
+                                logger.error(f"Post-sync finalization failed for note {note_id}: {e}")
+                                
+                            metrics.record_metric("emr_sync", True)
+                            return
+                        
+                        except httpx.RequestError as e:
+                            logger.error(f"EMR sync request error for note {note_id}: {e}")
+                        except httpx.HTTPStatusError as e:
+                            logger.error(f"EMR sync HTTP error for note {note_id}: {e}")
+                            
+                        if attempt < max_retries:
+                            time.sleep(2 ** attempt)  # simple backoff
+                            
+                # If we exit the loop, all retries failed or we broke early on a 4xx
                 note.sync_status = SyncStatus.FAILED
+                db.commit()
+                metrics.record_metric("emr_sync", False)
                 
-            db.commit()
+            except Exception as e:
+                logger.error(f"Failed to sync note {note_id}: {e}", exc_info=True)
+                note.sync_status = SyncStatus.FAILED
+                db.commit()
+                metrics.record_metric("emr_sync", False)
             
         except Exception as e:
             logger.error(f"Failed to sync note {note_id}: {e}", exc_info=True)
             db.rollback()
-            try:
-                # Refresh note object in a new query to update status despite failure, never un-signing it
-                note = db.query(SOAPNote).filter(SOAPNote.id == note_id).first()
-                if note:
-                    note.sync_status = SyncStatus.FAILED
-                    db.commit()
-            except Exception:
-                pass
         finally:
             db.close()

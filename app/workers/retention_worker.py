@@ -92,10 +92,15 @@ class RetentionWorker:
         except Exception as e:
             logger.error(f"Retention worker error: {e}", exc_info=True)
             db.rollback()
+            from app.core.metrics import metrics
+            metrics.record_metric("retention", False)
         finally:
             db.close()
             
         if deleted_count > 0:
             logger.info(f"Retention sweep complete: {deleted_count} artifact(s) deleted")
+            from app.core.metrics import metrics
+            for _ in range(deleted_count):
+                metrics.record_metric("retention", True)
         
         return deleted_count

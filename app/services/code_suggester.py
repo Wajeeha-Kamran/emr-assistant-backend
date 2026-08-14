@@ -44,22 +44,52 @@ class CodeSuggesterService:
             matches = []
 
             # 1. Search ICD10 codes using Assessment
-            if not is_empty(assessment_text):
-                icd10_matches = ref_service.search_codes(
-                    text=assessment_text, 
-                    top_k=5, 
-                    code_type=CodeType.ICD10
-                )
-                matches.extend(icd10_matches)
-
             # 2. Search CPT codes using Plan
-            if not is_empty(plan_text):
-                cpt_matches = ref_service.search_codes(
-                    text=plan_text, 
-                    top_k=5, 
-                    code_type=CodeType.CPT
-                )
-                matches.extend(cpt_matches)
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+            from app.core.config import settings
+            from app.core.metrics import metrics
+            from fastapi import HTTPException
+            
+            def _run_searches():
+                _matches = []
+                if not is_empty(assessment_text):
+                    icd10_matches = ref_service.search_codes(
+                        text=assessment_text, 
+                        top_k=5, 
+                        code_type=CodeType.ICD10
+                    )
+                    _matches.extend(icd10_matches)
+                if not is_empty(plan_text):
+                    cpt_matches = ref_service.search_codes(
+                        text=plan_text, 
+                        top_k=5, 
+                        code_type=CodeType.CPT
+                    )
+                    _matches.extend(cpt_matches)
+                return _matches
+
+            try:
+                executor = ThreadPoolExecutor(max_workers=1)
+                try:
+                    future = executor.submit(_run_searches)
+                    matches = future.result(timeout=settings.NLP_TIMEOUT_SECONDS)
+                    metrics.record_metric("code_suggestion", True)
+                except FuturesTimeoutError:
+                    metrics.record_metric("code_suggestion", False)
+                    logger.warning("CodeSuggestion inference timed out. Underlying thread continues.")
+                    raise HTTPException(
+                        status_code=503, 
+                        detail="NLP Engine Timeout", 
+                        headers={"Retry-After": "5"}
+                    )
+                finally:
+                    executor.shutdown(wait=False)
+            except Exception as e:
+                from fastapi import HTTPException
+                if isinstance(e, HTTPException):
+                    raise
+                metrics.record_metric("code_suggestion", False)
+                raise e
 
             if not matches:
                 logger.info(f"Note {soap_note_id} has empty/fallback Assessment and Plan, or yielded no matches. Skipping suggestions.")
