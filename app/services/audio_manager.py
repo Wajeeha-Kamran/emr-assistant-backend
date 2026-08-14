@@ -49,7 +49,10 @@ class AudioManager:
             
         if duration_seconds > 1800:
             os.remove(file_path)
-            raise ValueError(f"Audio exceeds maximum allowed duration of 30 minutes (got {duration_seconds}s)")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Audio exceeds maximum allowed duration of 30 minutes (got {duration_seconds}s)"
+            )
             
         return AudioMetadata(
             session_id=session_id,

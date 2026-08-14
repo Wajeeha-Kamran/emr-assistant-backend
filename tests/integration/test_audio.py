@@ -83,3 +83,22 @@ def test_stop_recording_invalid_state(client, monkeypatch):
     
     assert stop_resp.status_code == 409
     assert "Illegal state transition" in stop_resp.json()["detail"]
+
+def test_stop_recording_too_long(client, monkeypatch):
+    monkeypatch.setattr(TinyTag, 'get', mock_tinytag_get(1801.0))
+    client.post("/api/v1/auth/register", json={"email": "doc_audio_long@example.com", "full_name": "Audio Long Doc", "password": "pwd"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_long@example.com", "password": "pwd"})
+    token = login_resp.json()["access_token"]
+    
+    create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
+    session_id = create_resp.json()["id"]
+    
+    client.post(f"/api/v1/sessions/{session_id}/start-recording", headers={"Authorization": f"Bearer {token}"})
+    
+    file_content = b"fake audio content"
+    files = {"file": ("test.wav", BytesIO(file_content), "audio/wav")}
+    
+    stop_resp = client.post(f"/api/v1/sessions/{session_id}/stop-recording", headers={"Authorization": f"Bearer {token}"}, files=files)
+    
+    assert stop_resp.status_code == 400
+    assert "Audio exceeds maximum allowed duration" in stop_resp.json()["detail"]

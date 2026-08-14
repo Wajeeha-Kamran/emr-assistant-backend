@@ -2,6 +2,12 @@ import time
 import httpx
 from fastapi.testclient import TestClient
 from app.main import app
+
+# NOTE: This script measures API-layer plumbing and routing reliability.
+# It mocks out ASR, NLP, and external EMR sync dependencies.
+# It is NOT the true 95%+ NFR measurement, which requires real models
+# running against genuine audio. See pipeline_real_success_rate.py for the NFR measurement.
+
 from app.db.session import SessionLocal
 from app.models.doctor import Doctor
 from app.core.security import create_access_token
