@@ -4,7 +4,10 @@ import time
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.soap_note import SOAPNote, SyncStatus
+from app.models.session import SessionStatus
 from app.core.config import settings
+from app.services.session_manager import SessionManager
+from app.services.retention_service import RetentionService
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +110,19 @@ class EMRSyncClient:
                     
             if success:
                 note.sync_status = SyncStatus.SUCCESS
+                
+                # Close broken links: transition session STOPPED → FINALIZED via the
+                # state machine and flag audio for cleanup (retention timer starts now).
+                # Both use commit=False so everything lands in a single transaction.
+                try:
+                    if session.status == SessionStatus.STOPPED:
+                        SessionManager.transition_state(db, session, SessionStatus.FINALIZED, commit=False)
+                        RetentionService.mark_audio_for_cleanup(db, session.id, commit=False)
+                except Exception as e:
+                    # logger.error — if finalization fails, audio is never flagged and therefore
+                    # never deleted. This is a silent, permanent retention failure. It fails in the
+                    # safe direction (audio is kept), but it must be loud.
+                    logger.error(f"Post-sync finalization failed for note {note_id}: {e}")
             else:
                 note.sync_status = SyncStatus.FAILED
                 

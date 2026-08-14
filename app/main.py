@@ -1,13 +1,40 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.core.config import settings
 from app.core.logging import setup_logging
 
-from app.api.v1.endpoints import auth, sessions, transcripts, soap_notes, code_suggestions, signatures, emr_sync
+from app.api.v1.endpoints import auth, sessions, transcripts, soap_notes, code_suggestions, signatures, emr_sync, retention
 
 setup_logging()
 
+# NOTE: This APScheduler instance runs in-process. Running multiple app workers
+# (e.g. via gunicorn --workers N) would spawn multiple schedulers, each executing
+# the retention job independently. This is acceptable for this prototype but must
+# be addressed in Module 10.1 (containerization) with a single-leader pattern or
+# an external scheduler.
+from apscheduler.schedulers.background import BackgroundScheduler
+from app.workers.retention_worker import RetentionWorker
+
+scheduler = BackgroundScheduler()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    scheduler.add_job(
+        RetentionWorker.run_cleanup,
+        "interval",
+        seconds=settings.RETENTION_SWEEP_INTERVAL_SECONDS,
+        id="retention_sweep",
+        replace_existing=True,
+    )
+    scheduler.start()
+    yield
+    # Shutdown
+    scheduler.shutdown(wait=False)
+
 app = FastAPI(
-    title=settings.PROJECT_NAME
+    title=settings.PROJECT_NAME,
+    lifespan=lifespan
 )
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
@@ -18,6 +45,7 @@ app.include_router(soap_notes.note_router, prefix="/api/v1/soap-notes", tags=["s
 app.include_router(code_suggestions.router, prefix="/api/v1/soap-notes", tags=["code_suggestions"])
 app.include_router(signatures.router, prefix="/api/v1/soap-notes", tags=["signatures"])
 app.include_router(emr_sync.router, prefix="/api/v1/soap-notes", tags=["emr_sync"])
+app.include_router(retention.router, prefix="/api/v1/admin", tags=["retention"])
 
 @app.get("/health")
 def health_check():

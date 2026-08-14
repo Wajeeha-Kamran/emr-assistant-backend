@@ -15,6 +15,12 @@ class Settings(BaseSettings):
     ASR_ENGINE: str = "whisper"          # Options: "whisper", "riva"
     DIARIZATION_PAUSE_THRESHOLD: float = 1.5
 
+    # Retention: audio is held for RETENTION_WINDOW_MINUTES after being flagged,
+    # then deleted on the next sweep. Worst-case latency = window + interval.
+    # With defaults 4 min + 60 s = 5 min, satisfying the SRS's 5-minute NFR.
+    RETENTION_WINDOW_MINUTES: int = 4
+    RETENTION_SWEEP_INTERVAL_SECONDS: int = 60
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

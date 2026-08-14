@@ -8,7 +8,7 @@ class AudioMetadata(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     session_id: Mapped[int] = mapped_column(ForeignKey("consultation_sessions.id"), unique=True, nullable=False)
-    file_path: Mapped[str] = mapped_column(String, nullable=False)
+    file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     duration_seconds: Mapped[float] = mapped_column(Float, nullable=False)
     format: Mapped[str] = mapped_column(String, nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)

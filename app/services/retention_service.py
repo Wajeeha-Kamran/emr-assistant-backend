@@ -5,7 +5,7 @@ from app.models.audio import AudioMetadata
 
 class RetentionService:
     @staticmethod
-    def mark_audio_for_cleanup(db: Session, session_id: int) -> AudioMetadata | None:
+    def mark_audio_for_cleanup(db: Session, session_id: int, commit: bool = True) -> AudioMetadata | None:
         """
         Flags the session's audio metadata as eligible for deletion.
         Strictly restricted to FINALIZED sessions.
@@ -26,7 +26,8 @@ class RetentionService:
             
         if audio.retention_marked_for_deletion_at is None:
             audio.retention_marked_for_deletion_at = datetime.now(timezone.utc)
-            db.commit()
-            db.refresh(audio)
+            if commit:
+                db.commit()
+                db.refresh(audio)
             
         return audio
