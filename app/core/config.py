@@ -4,6 +4,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "EMR Assistant Backend"
     APP_ENV: str  # Required setting to ensure config fails loudly if missing
     DATABASE_URL: str
+    SIMULATED_EMR_URL: str
     
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"

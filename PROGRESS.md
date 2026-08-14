@@ -33,8 +33,8 @@
 - [x] Gap Closure (UC-08) — Reviewable and Editable Code Suggestions
 
 ## PHASE 6 — EMR Synchronization
-- [ ] Module 6.1 — Simulated EMR Service
-- [ ] Module 6.2 — EMR Sync Client
+- [x] Module 6.1 — Simulated EMR Service
+- [x] Module 6.2 — EMR Sync Client
 
 ## PHASE 7 — Retention Enforcement & Data Lifecycle
 - [ ] Module 7.1 — Automated Retention/Cleanup Job

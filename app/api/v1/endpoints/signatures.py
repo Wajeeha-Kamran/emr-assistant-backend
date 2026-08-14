@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_doctor
 from app.models.doctor import Doctor
@@ -13,6 +13,7 @@ router = APIRouter()
 @router.post("/{note_id}/sign", response_model=SignatureResponse, status_code=status.HTTP_201_CREATED)
 def sign_soap_note(
     note_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: Doctor = Depends(get_current_doctor)
 ):
@@ -36,7 +37,7 @@ def sign_soap_note(
         )
         
     try:
-        signature = NoteFinalizerService.sign_note(db, note_id, current_user.id)
+        signature = NoteFinalizerService.sign_note(db, note_id, current_user.id, background_tasks)
         return signature
     except SOAPNoteAlreadySignedError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))

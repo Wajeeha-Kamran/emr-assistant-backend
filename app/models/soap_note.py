@@ -9,6 +9,11 @@ class SOAPNoteStatus(str, enum.Enum):
     DRAFT = "DRAFT"
     SIGNED = "SIGNED"
 
+class SyncStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
 
 class SOAPSectionType(str, enum.Enum):
     SUBJECTIVE = "SUBJECTIVE"
@@ -23,6 +28,7 @@ class SOAPNote(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     session_id: Mapped[int] = mapped_column(ForeignKey("consultation_sessions.id"), unique=True, nullable=False, index=True)
     status: Mapped[SOAPNoteStatus] = mapped_column(Enum(SOAPNoteStatus), default=SOAPNoteStatus.DRAFT, nullable=False)
+    sync_status: Mapped[SyncStatus | None] = mapped_column(Enum(SyncStatus), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     last_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
