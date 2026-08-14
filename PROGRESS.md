@@ -30,6 +30,7 @@
 ## PHASE 5 — Doctor Review, Edit, Approve & Sign Workflow
 - [x] Module 5.1 — Review & Edit API
 - [x] Module 5.2 — Signature Model & Approve/Sign Endpoint
+- [x] Gap Closure (UC-08) — Reviewable and Editable Code Suggestions
 
 ## PHASE 6 — EMR Synchronization
 - [ ] Module 6.1 — Simulated EMR Service

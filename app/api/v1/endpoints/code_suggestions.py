@@ -5,10 +5,10 @@ import logging
 
 from app.api.deps import get_db, get_current_doctor
 from app.models.doctor import Doctor
-from app.models.soap_note import SOAPNote
+from app.models.soap_note import SOAPNote, SOAPNoteStatus
 from app.models.session import ConsultationSession
 from app.models.code_suggestion import CodeSuggestion
-from app.schemas.code_suggestion import CodeSuggestionResponse
+from app.schemas.code_suggestion import CodeSuggestionResponse, CodeSuggestionUpdateRequest
 from app.services.code_suggester import CodeSuggesterService, SOAPNoteAlreadySignedError
 
 logger = logging.getLogger(__name__)
@@ -75,3 +75,38 @@ def get_code_suggestions(
     )
     
     return suggestions
+
+@router.patch("/{note_id}/code-suggestions/{suggestion_id}", response_model=CodeSuggestionResponse)
+def update_code_suggestion(
+    note_id: int,
+    suggestion_id: int,
+    request: CodeSuggestionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_doctor)
+):
+    note = get_soap_note_or_404(db, note_id, current_doctor)
+    
+    if note.status == SOAPNoteStatus.SIGNED:
+        # Note: We throw a 409 here to match existing behavior for signed notes
+        # but the request was actually to modify a signed note so 409 is correct.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify code suggestions on a signed SOAP note."
+        )
+        
+    suggestion = db.query(CodeSuggestion).filter(
+        CodeSuggestion.id == suggestion_id,
+        CodeSuggestion.soap_note_id == note.id
+    ).first()
+    
+    if not suggestion:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Code suggestion not found or does not belong to this note."
+        )
+        
+    suggestion.accepted = request.accepted
+    db.commit()
+    db.refresh(suggestion)
+    
+    return suggestion

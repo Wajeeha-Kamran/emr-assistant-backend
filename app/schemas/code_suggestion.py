@@ -11,3 +11,6 @@ class CodeSuggestionResponse(BaseModel):
     accepted: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+class CodeSuggestionUpdateRequest(BaseModel):
+    accepted: bool

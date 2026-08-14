@@ -203,3 +203,100 @@ def test_unauthenticated_access(client: TestClient, db: Session):
     
     response = client.get("/api/v1/soap-notes/1/code-suggestions")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+def test_accept_suggestion_success(client: TestClient, db: Session, api_setup: dict):
+    doc = api_setup["doc"]
+    token = api_setup["token"]
+    
+    session = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    db.add(session)
+    db.commit()
+    
+    note = SOAPNote(session_id=session.id, status=SOAPNoteStatus.DRAFT)
+    db.add(note)
+    db.commit()
+    
+    sug = CodeSuggestion(soap_note_id=note.id, code="I10", description="HTN", code_type=CodeType.ICD10, rank=1, confidence_score=0.9, accepted=False)
+    db.add(sug)
+    db.commit()
+    
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Set to true
+    res1 = client.patch(f"/api/v1/soap-notes/{note.id}/code-suggestions/{sug.id}", json={"accepted": True}, headers=headers)
+    assert res1.status_code == status.HTTP_200_OK
+    assert res1.json()["accepted"] is True
+    
+    db.refresh(sug)
+    assert sug.accepted is True
+    
+    # Set to false
+    res2 = client.patch(f"/api/v1/soap-notes/{note.id}/code-suggestions/{sug.id}", json={"accepted": False}, headers=headers)
+    assert res2.status_code == status.HTTP_200_OK
+    assert res2.json()["accepted"] is False
+    
+    db.refresh(sug)
+    assert sug.accepted is False
+
+def test_accept_suggestion_signed_note_rejected(client: TestClient, db: Session, api_setup: dict):
+    doc = api_setup["doc"]
+    token = api_setup["token"]
+    
+    session = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    db.add(session)
+    db.commit()
+    
+    note = SOAPNote(session_id=session.id, status=SOAPNoteStatus.SIGNED)
+    db.add(note)
+    db.commit()
+    
+    sug = CodeSuggestion(soap_note_id=note.id, code="I10", description="HTN", code_type=CodeType.ICD10, rank=1, confidence_score=0.9, accepted=False)
+    db.add(sug)
+    db.commit()
+    
+    headers = {"Authorization": f"Bearer {token}"}
+    res = client.patch(f"/api/v1/soap-notes/{note.id}/code-suggestions/{sug.id}", json={"accepted": True}, headers=headers)
+    assert res.status_code == status.HTTP_409_CONFLICT
+    assert "signed" in res.json()["detail"].lower()
+
+def test_accept_suggestion_ownership_denied(client: TestClient, db: Session, api_setup: dict):
+    doc = api_setup["doc"]
+    other_token = api_setup["other_token"]
+    
+    session = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    db.add(session)
+    db.commit()
+    
+    note = SOAPNote(session_id=session.id, status=SOAPNoteStatus.DRAFT)
+    db.add(note)
+    db.commit()
+    
+    sug = CodeSuggestion(soap_note_id=note.id, code="I10", description="HTN", code_type=CodeType.ICD10, rank=1, confidence_score=0.9, accepted=False)
+    db.add(sug)
+    db.commit()
+    
+    headers = {"Authorization": f"Bearer {other_token}"}
+    res = client.patch(f"/api/v1/soap-notes/{note.id}/code-suggestions/{sug.id}", json={"accepted": True}, headers=headers)
+    assert res.status_code == status.HTTP_404_NOT_FOUND
+
+def test_accept_suggestion_mismatched_ids(client: TestClient, db: Session, api_setup: dict):
+    doc = api_setup["doc"]
+    token = api_setup["token"]
+    
+    session1 = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    session2 = ConsultationSession(doctor_id=doc.id, status=SessionStatus.FINALIZED)
+    db.add_all([session1, session2])
+    db.commit()
+    
+    note1 = SOAPNote(session_id=session1.id, status=SOAPNoteStatus.DRAFT)
+    note2 = SOAPNote(session_id=session2.id, status=SOAPNoteStatus.DRAFT)
+    db.add_all([note1, note2])
+    db.commit()
+    
+    sug = CodeSuggestion(soap_note_id=note1.id, code="I10", description="HTN", code_type=CodeType.ICD10, rank=1, confidence_score=0.9, accepted=False)
+    db.add(sug)
+    db.commit()
+    
+    headers = {"Authorization": f"Bearer {token}"}
+    res = client.patch(f"/api/v1/soap-notes/{note2.id}/code-suggestions/{sug.id}", json={"accepted": True}, headers=headers)
+    assert res.status_code == status.HTTP_404_NOT_FOUND
