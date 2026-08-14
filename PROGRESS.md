@@ -37,7 +37,7 @@
 - [x] Module 6.2 — EMR Sync Client
 
 ## PHASE 7 — Retention Enforcement & Data Lifecycle
-- [ ] Module 7.1 — Automated Retention/Cleanup Job
+- [x] Module 7.1 — Automated Retention/Cleanup Job
 
 ## PHASE 8 — Security, Reliability & Performance Hardening
 - [ ] Module 8.1 — Security Hardening
