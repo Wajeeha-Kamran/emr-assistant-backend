@@ -18,7 +18,17 @@ def sign_soap_note(
     current_user: Doctor = Depends(get_current_doctor)
 ):
     """
-    Signs the specified SOAP note, locking it from further edits and creating a Signature record.
+    Sign the note. This is the irreversible step.
+
+    Signing does three things: it locks the note against further edits, it marks
+    the session finalised so its audio becomes eligible for deletion, and it
+    triggers a background sync to the external EMR.
+
+    A note can only be signed once; a second attempt returns 409.
+
+    Clients should treat this as a deliberate action requiring confirmation. Up
+    to this point everything the system produced was a draft under review; after
+    it, the note is a clinical record.
     """
     # 1. Ownership and existence check
     note = (

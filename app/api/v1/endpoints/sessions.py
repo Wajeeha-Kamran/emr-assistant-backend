@@ -17,6 +17,13 @@ def create_session(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor),
 ):
+    """
+    Create a consultation session.
+
+    The session is the container everything else attaches to: the audio, the
+    transcript, the SOAP note, the signature and the sync record. It starts in
+    CREATED and must be started before audio can be uploaded.
+    """
     # No request body is accepted. The doctor_id is strictly sourced from the JWT.
     session = SessionManager.create_session(db=db, doctor_id=current_doctor.id)
     return session
@@ -27,6 +34,16 @@ def start_recording(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor),
 ):
+    """
+    Move the session into RECORDING.
+
+    Call this when the doctor begins recording, before any audio is uploaded.
+    A session already recording returns 409 — the state machine does not allow
+    a second start, which prevents one consultation being recorded twice over.
+
+    A session belonging to another doctor returns 404 rather than 403, so the
+    API does not reveal that it exists.
+    """
     session = db.query(ConsultationSession).filter(
         ConsultationSession.id == session_id,
         ConsultationSession.doctor_id == current_doctor.id
@@ -56,6 +73,20 @@ def stop_recording(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor),
 ):
+    """
+    Upload the consultation audio and end the recording.
+
+    Accepts a multipart file. Common audio and video container types are
+    accepted, including all the MIME spellings of WAV that clients use in
+    practice — Windows reports `audio/wave` where browsers send `audio/wav`.
+
+    Returns as soon as the file is stored and validated. **Transcription then
+    runs in the background** and takes roughly as long as the recording itself
+    on CPU, so do not expect a transcript immediately; poll the transcript
+    endpoint.
+
+    Recordings longer than the configured maximum are rejected with 400.
+    """
     session = db.query(ConsultationSession).filter(
         ConsultationSession.id == session_id,
         ConsultationSession.doctor_id == current_doctor.id

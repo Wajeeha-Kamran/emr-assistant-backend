@@ -16,6 +16,22 @@ def get_transcript(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor),
 ):
+    """
+    Fetch the transcript, with each segment labelled DOCTOR or PATIENT.
+
+    **Poll this endpoint.** `status` is `processing` until transcription
+    finishes, then `completed`, or `failed` if it did not. A SOAP note cannot be
+    generated until the status is `completed`.
+
+    Segments are returned in chronological order.
+
+    Speaker labels are produced by a diarization pipeline whose accuracy has been
+    measured rather than assumed: it meets its target when the two voices are
+    acoustically distinguishable and speak at a conversational pace, and degrades
+    when the voices are similar or turn-taking is rapid. Clients should treat
+    speaker labels as correctable by the clinician, not as ground truth. See
+    docs/module_9_1_accuracy.md.
+    """
     # Ownership verification
     session = db.query(ConsultationSession).filter(
         ConsultationSession.id == session_id,
@@ -44,6 +60,16 @@ def retry_transcription(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor),
 ):
+    """
+    Re-run transcription for a session whose transcript failed.
+
+    Resets the transcript to `processing` and starts the pipeline again, so any
+    previously produced segments are replaced.
+
+    Returns 409 if transcription is already running — the guard prevents two
+    passes writing segments for the same session at once. Note that calling this
+    on a transcript that already completed will discard it and start over.
+    """
     # Ownership verification
     session = db.query(ConsultationSession).filter(
         ConsultationSession.id == session_id,

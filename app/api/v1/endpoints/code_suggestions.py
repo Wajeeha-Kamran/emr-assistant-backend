@@ -38,6 +38,18 @@ def generate_code_suggestions(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor)
 ):
+    """
+    Generate ranked ICD-10 and CPT suggestions for a note.
+
+    Diagnosis codes are drawn from the Assessment section and procedure codes
+    from the Plan section, matched against the reference code set by clinical
+    similarity. Returns five of each, ranked 1 to 10 with no gaps.
+
+    Regenerating replaces the previous suggestions. A signed note returns 409.
+
+    Suggestions are proposals for the clinician to accept, not billing
+    decisions.
+    """
     note = get_soap_note_or_404(db, note_id, current_doctor)
     
     try:
@@ -64,6 +76,11 @@ def get_code_suggestions(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor)
 ):
+    """
+    Fetch the stored code suggestions for a note, in rank order.
+
+    Each carries an `accepted` flag showing whether the clinician has taken it.
+    """
     # Verify ownership before returning suggestions
     get_soap_note_or_404(db, note_id, current_doctor)
     
@@ -84,6 +101,12 @@ def update_code_suggestion(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor)
 ):
+    """
+    Accept or unaccept a single code suggestion.
+
+    A suggestion belonging to a different note is rejected with 400. Suggestions
+    on a signed note cannot be changed and return 409.
+    """
     note = get_soap_note_or_404(db, note_id, current_doctor)
     
     if note.status == SOAPNoteStatus.SIGNED:

@@ -18,6 +18,13 @@ def get_sync_status(
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor)
 ):
+    """
+    Report the status of the background sync to the external EMR.
+
+    Signing queues the sync; it does not complete synchronously. Poll here.
+    A failed sync leaves the note intact and the session's audio undeleted, so
+    nothing is lost and the sync can be retried.
+    """
     note = (
         db.query(SOAPNote)
         .join(ConsultationSession)

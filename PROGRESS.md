@@ -55,6 +55,25 @@
     assumed. Celery/Redis evaluated and rejected on evidence.
   - Full write-up: docs/module_8_3_performance.md
 
+## Module 3 revisit — SOAP classification quality (16 Aug 2026)
+- [x] Measured with scripts/evaluate_soap.py against 73 labelled doctor
+      sentences in docs/evidence/soap_expected.md
+      - Noise rate 100% -> 0%. The note no longer contains any greeting or
+        question. This is the large, unambiguous win.
+      - Clinical accuracy 74.4% -> 71.8%. Unchanged in real terms (one
+        sentence out of 39); do not report this as an improvement.
+      - Changes: sentence-level classification, filtering of questions /
+        announcements / pleasantries, reference anchors rebalanced to six
+        per category.
+- [ ] KNOWN LIMITATION: Assessment scores 1/5 and will not yield to anchor
+      tuning. ClinicalBERT's mean-pooled embedding captures what a sentence
+      is ABOUT, not what the speaker is DOING with it — diagnosing,
+      measuring and instructing are speech acts, and topic similarity cannot
+      separate them. Two routes: diagnostic-cue detection (must be written
+      from documentation conventions, not from the failing sentences), or a
+      supervised classifier trained on labelled SOAP sentences.
+      Full write-up: docs/module_3_soap_classification.md
+
 ## PHASE 9 — Testing, QA & API Documentation
 - [ ] Module 9.1 — Full pytest Suite Mapped to TC-01…TC-10
   - [x] Part A — tests reorganised to TC-01…TC-10 with a dedicated test DB
@@ -114,8 +133,10 @@
 - [ ] Module 10.4 — Final Backend Review & Frontend Handoff Package
 
 ## Additional tasks (not in the original roadmap)
-- [ ] CORS configuration — required before the Blazor web frontend; not needed
-      for the .NET MAUI mobile app
+- [x] CORS configuration — already present in app/main.py with
+      allow_origins=["*"]. Confirmed 16 Aug 2026; this entry was stale.
+      NOTE for Module 10.3: "*" is a development setting. Restrict to the
+      frontend's real origin before deployment.
 - [ ] BioGPT design-comparison script (scripts/soap_pipeline_comparison.py) —
       produces a report figure showing raw / hybrid / extractive output
 - [ ] ASR word-accuracy measurement vs the 85% NFR — never measured

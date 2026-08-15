@@ -19,7 +19,23 @@ def generate_soap_note_draft(
     current_user: Doctor = Depends(get_current_doctor)
 ):
     """
-    Generates a new SOAP note draft for the given session.
+    Generate a draft SOAP note from the completed transcript.
+
+    Requires a transcript with status `completed`; otherwise returns 409.
+
+    The pipeline is extractive: every word in the note comes from the transcript,
+    nothing is invented. Patient speech becomes Subjective; doctor speech is
+    classified sentence by sentence into Objective, Assessment and Plan.
+    Questions, greetings and announcements are excluded, since they document
+    nothing.
+
+    Regenerating replaces an existing draft and its code suggestions. A signed
+    note cannot be regenerated and returns 409.
+
+    **This is a draft for clinical review.** Classification of Assessment in
+    particular is known to be weak — diagnostic statements are frequently filed
+    under Objective. Clients must present this as editable. See
+    docs/module_3_soap_classification.md.
     """
     try:
         soap_note = SOAPNoteService.generate_and_save_draft(db, session_id, current_user.id)
@@ -40,7 +56,10 @@ def get_soap_note(
     current_user: Doctor = Depends(get_current_doctor)
 ):
     """
-    Retrieves the current SOAP note for the given session.
+    Fetch the SOAP note for a session, with its four sections.
+
+    `status` is DRAFT or SIGNED. A signed note is immutable: edits and
+    regenerated suggestions are both rejected.
     """
     # 1. Verify ownership of the session
     session = db.query(ConsultationSession).filter(
@@ -66,7 +85,15 @@ def update_soap_section(
     current_user: Doctor = Depends(get_current_doctor)
 ):
     """
-    Updates a specific section of a SOAP note.
+    Edit one section of a draft SOAP note.
+
+    This is the clinician review step the whole system is built around — the
+    generated note is a starting point, and this is where it becomes correct.
+
+    Empty content is rejected with 422. A section belonging to a different note
+    is rejected with 400. Editing a signed note returns 409: signing is
+    deliberately irreversible, because a clinical record that can be altered
+    after signature is not a record.
     """
     note = (
         db.query(SOAPNote)

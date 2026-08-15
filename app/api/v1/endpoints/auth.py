@@ -13,6 +13,14 @@ router = APIRouter()
 
 @router.post("/register", response_model=DoctorResponse, status_code=status.HTTP_201_CREATED)
 def register(doctor_in: DoctorCreate, db: Session = Depends(get_db)):
+    """
+    Register a new doctor account.
+
+    The email must be unique; a duplicate returns 400. The password is hashed
+    before storage and is never returned by any endpoint.
+
+    Registration does not log you in — call /login next to obtain a token.
+    """
     # Explicitly DO NOT log doctor_in or its password.
     existing_doctor = db.query(Doctor).filter(Doctor.email == doctor_in.email).first()
     if existing_doctor:
@@ -33,6 +41,16 @@ def register(doctor_in: DoctorCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """
+    Exchange email and password for a bearer token.
+
+    Send as form data (`username` and `password`), not JSON — this follows the
+    OAuth2 password flow so that interactive API docs can authorise directly.
+    The `username` field takes the doctor's email address.
+
+    Pass the returned token as `Authorization: Bearer <token>` on every other
+    endpoint.
+    """
     # Explicitly DO NOT log form_data.password.
     doctor = db.query(Doctor).filter(Doctor.email == form_data.username).first()
     if not doctor or not verify_password(form_data.password, doctor.hashed_password):
@@ -51,4 +69,10 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @router.get("/me", response_model=DoctorResponse)
 def read_users_me(current_doctor: Doctor = Depends(get_current_doctor)):
+    """
+    Return the currently authenticated doctor.
+
+    Useful for confirming a token is valid and identifying whose session data
+    the client is about to display.
+    """
     return current_doctor
