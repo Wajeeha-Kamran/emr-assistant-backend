@@ -31,7 +31,10 @@ class ASRService:
             segments.append({
                 "start": segment.get("start"),
                 "end": segment.get("end"),
-                "text": segment.get("text", "").strip()
+                "text": segment.get("text", "").strip(),
+                # Word timestamps feed window-based diarization. Kept out of
+                # the persisted transcript; used only during processing.
+                "words": segment.get("words") or []
             })
             
         return {
@@ -95,7 +98,7 @@ class ASRService:
             
             # 3. Run diarization
             try:
-                diarized = DiarizationService.diarize_segments(asr_result.get("segments", []))
+                diarized = DiarizationService.diarize_segments(asr_result.get("segments", []), audio.file_path)
                 metrics.record_metric("diarization", True)
             except Exception:
                 metrics.record_metric("diarization", False)

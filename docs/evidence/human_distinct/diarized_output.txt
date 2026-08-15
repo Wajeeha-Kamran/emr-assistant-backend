@@ -1,0 +1,56 @@
+===== Script 1 =====
+DOCTOR: Good morning. Please take a seat. What brings you in today?
+PATIENT: I have been having really bad adage for about 4 days now.
+DOCTOR: Can you describe the pain for me?
+PATIENT: It's mostly on the right side, behind my eye. It drops bright light makes it much worse.
+DOCTOR: Have you felt sick at all or been vomiting? I
+PATIENT: know she has yesterday morning, but I have actually been sick.
+DOCTOR: Any changes to your vision, blurring or flashing lights?
+PATIENT: Sometimes there are little zigzag lines before it starts.
+DOCTOR: Have you had headaches like this before?
+PATIENT: Not sure this bad. I get normal headaches, but nothing like this.
+DOCTOR: Are you taking any medications at the moment?
+PATIENT: Just pelsomol when it gets bad. It does not help much.
+DOCTOR: Let me check your blood pressure. Your blood pressure is 140 over 90, which is elevated. Pupils are equal and reactive. No next -tiffness. This looks like migraine with aura and your blood pressure is higher than what I would like. I am going to prescribe some atriptin 50mg for the attacks. Keep a headache diary for 2 weeks. Come back in 2 weeks so we can recheck your blood pressure. If the pain becomes suddenly severe or your develop weakness or confusion, go to the emergency department immediately.
+PATIENT: Understood. Thank you doctor.
+
+===== Script 2 =====
+PATIENT: Hello, come in. What happened?
+DOCTOR: I twisted my ankle playing football yesterday evening.
+PATIENT: Which ankle?
+DOCTOR: The right one. Could you walk
+PATIENT: on it afterwards?
+DOCTOR: Barely I limped off the pitch and it's been swollen since. Did you hear a pop or a crack at the time? No, nothing like that. Have you put anything on it? Just ice last night and I kept it up on a cushion. Any previous injuries to that ankle? I sprained it about two years ago, the same side.
+PATIENT: Let me have a look. There is swelling over the lateral malacious and tenderness on the outer side. No bony tenderness at the posterior edge. You can bear weight just about. Range of motion is reduced by pain. This is a lateral ankle sprain, grade 2. I do not think it is fractured and by the outower rules you do not need an x -ray. Rest, ice compression and elevation for the next three days. Take eye -proofing for 400 mg, 3 times daily with food. Start gentle movement after day 3. If you still cannot bear weight in a week, come back and we will arrange imaging.
+DOCTOR: How long until I can play again?
+PATIENT: Realistically 4 to 6 weeks and only after you can hop on it without pain.
+
+===== Script 3 =====
+DOCTOR: Hi there, what can I do for you?
+PATIENT: My throat has been really sore since Saturday and it hurts to swallow. Do you have a fever? I felt hot last night. I didn't take my temperature.
+DOCTOR: Okay, any cough?
+PATIENT: No cough at all actually.
+DOCTOR: Any swelling in your neck or tenderness?
+PATIENT: Yeah, under my jaw feels tender.
+DOCTOR: Anyone at home or at work? Unwell?
+PATIENT: My daughter had a sore throat last week.
+DOCTOR: Let me examine you. Temperature is 38 .2. The tonsils are enlarged with white exudite on both sides. There is tender cervical lymphodenum pethi, no cough reported. That gives you a center score of 4, which makes bacterial infection likely rather than viral. Right. I will start you on phenoxymythylene penicillin 250mg, 4 times a day for 10 days. Finish the whole course even when you feel better, take parasitomol for the pain and drink plenty of fluids.
+PATIENT: Yeah, okay.
+DOCTOR: If you develop difficulty breathing or you cannot swallow your own saliva, that is an emergency and you should be seen straight away.
+PATIENT: Thank you.
+
+===== Script 4 =====
+DOCTOR: Good afternoon. This is your 3 month diabetes review, isn't it?
+PATIENT: That's right. It's been about 3 months since the last one.
+DOCTOR: How have things been going?
+PATIENT: Honestly mixed. I have been taking the net form, net for mind every day, but my sugar are still higher than I had like in the morning. I have been checking most days, usually around 8 or 9 before breakfast. In the evening, it's better. Maybe 6 or 7. I have been trying to walk more, about 20 minutes most days. But work has been busy and I have missed some days. My weight is about the same at last time.
+DOCTOR: Any high pose? Any episodes of feeling shaky, sweaty, confused?
+PATIENT: No. Nothing like that.
+DOCTOR: How about your feet? Any numbness or tingling?
+PATIENT: A bit of tingling in my toes, it's night sometimes.
+DOCTOR: Okay. Any changes to your vision?
+PATIENT: Not that I have noticed.
+DOCTOR: Let me examine you and go through your results. Your blood pressure today is 132 over 84. Weight is unchanged at 86 kilograms. Your HP A1C has come back at 58 millimetres per month. The Tingling is not showing up as a myelible nerve damage yet. Overall, this is type 2 diabetes with some optimal glycemic control and some early neuropathic symptoms that are not yet confirmed on examination. I am going to increase your metformin to 1 gram twice daily. Please continue monitoring your morning readings and bring the record next time. I will refer you for retinal pain. I will use retinal screening which is due and I would like to repeat bloods in 3 months. If the tingling in your feet gets worse or spread, let me know sooner rather than waiting.
+PATIENT: Should I change anything about my diet?
+DOCTOR: Focus on the morning's reading. First, I will book you in with the diabetes nurse to go through evening meals. Since that is what usually drives the fasting numbers.
+PATIENT: Alright. Thank you doctor.

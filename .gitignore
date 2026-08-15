@@ -5,3 +5,6 @@ __pycache__/
 /storage/
 models/
 *.log
+docs/evidence/synthetic/parts/
+docs/evidence/consult_*.wav
+docs/evidence/diarized_output.txt

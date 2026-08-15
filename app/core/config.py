@@ -17,7 +17,22 @@ class Settings(BaseSettings):
     AUDIO_STORAGE_DIR: str = "./storage/audio"
     WHISPER_MODEL_NAME: str = "base.en"
     ASR_ENGINE: str = "whisper"          # Options: "whisper", "riva"
-    DIARIZATION_PAUSE_THRESHOLD: float = 1.5
+    # --- Diarization ---
+    # "embedding" = voice fingerprints clustered into two speakers (default).
+    # "pause"     = DEPRECATED original heuristic. Measured 15 Aug 2026: it
+    #               never fires, because Whisper leaves no gaps between
+    #               segments (93 gaps, mean 0.006s, max 0.560s). Retained only
+    #               for the design-evolution record.
+    # "pyannote" = purpose-built diarization pipeline (default).
+    # "window" / "embedding" / "pause" = earlier attempts, retained for
+    # the design-evolution record. See DiarizationService for measurements.
+    DIARIZATION_METHOD: str = "pyannote"
+
+    # Hugging Face read token, required by pyannote. Licences must be
+    # accepted for pyannote/segmentation-3.0 and
+    # pyannote/speaker-diarization-3.1 on huggingface.co.
+    HF_TOKEN: str = ""
+    DIARIZATION_PAUSE_THRESHOLD: float = 1.5  # only used by the deprecated method
     
     # --- NFR Reconciliation: Robustness vs Efficiency ---
     # The 5-second Robustness requirement governs how quickly a FAILURE is reported 

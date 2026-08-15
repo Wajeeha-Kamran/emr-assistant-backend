@@ -82,7 +82,15 @@ class WhisperEngine:
         try:
             with _INFERENCE_LOCK:
                 # We explicitly specify language="en" as required
-                result = self.model.transcribe(audio_path, language="en")
+                result = self.model.transcribe(
+                    audio_path,
+                    language="en",
+                    # Word-level timestamps are required by window-based
+                    # diarization: Whisper's segment boundaries follow
+                    # sentence structure, not speaker turns, so speakers
+                    # are separated at word granularity instead.
+                    word_timestamps=True,
+                )
             return result
         except Exception as e:
             # Wrapping any transcription/ffmpeg errors in a clean ASRError
