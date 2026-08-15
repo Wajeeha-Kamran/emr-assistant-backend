@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
     
+    # Encryption key for clinical text columns (Fernet, base64-encoded 32 bytes).
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    ENCRYPTION_KEY: str
+    
     AUDIO_STORAGE_DIR: str = "./storage/audio"
     WHISPER_MODEL_NAME: str = "base.en"
     ASR_ENGINE: str = "whisper"          # Options: "whisper", "riva"
@@ -37,3 +41,18 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
+
+# --- Fail loudly at startup if ENCRYPTION_KEY is missing or malformed ---
+# Constructing Fernet here validates the key format (must be 32 url-safe
+# base64-encoded bytes).  An absent or placeholder key stops the app
+# immediately with a clear error, rather than surfacing later inside a
+# request handler or background task.  This also satisfies Module 10.3.
+from cryptography.fernet import Fernet
+try:
+    Fernet(settings.ENCRYPTION_KEY.encode())
+except Exception as e:
+    raise SystemExit(
+        f"FATAL: ENCRYPTION_KEY is missing or malformed. "
+        f"Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"\n"
+        f"Error: {e}"
+    )

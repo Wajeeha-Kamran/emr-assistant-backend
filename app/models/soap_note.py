@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Enum, ForeignKey, Integer, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.core.encrypted_type import EncryptedText
 
 
 class SOAPNoteStatus(str, enum.Enum):
@@ -45,6 +46,6 @@ class SOAPSection(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     soap_note_id: Mapped[int] = mapped_column(ForeignKey("soap_notes.id", ondelete="CASCADE"), nullable=False, index=True)
     section_type: Mapped[SOAPSectionType] = mapped_column(Enum(SOAPSectionType), nullable=False)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(EncryptedText, nullable=False)
 
     note = relationship("SOAPNote", back_populates="sections")

@@ -19,8 +19,12 @@ class BioGPTEngine:
         
         # Load the tokenizer and model once
         try:
-            self.tokenizer = BioGptTokenizer.from_pretrained("microsoft/biogpt")
-            self.model = BioGptForCausalLM.from_pretrained("microsoft/biogpt").to(self.device)
+            self.tokenizer = BioGptTokenizer.from_pretrained(
+                "microsoft/biogpt", revision="eb0d815e95434dc9e3b78f464e52b899bee7d923"
+            )
+            self.model = BioGptForCausalLM.from_pretrained(
+                "microsoft/biogpt", revision="eb0d815e95434dc9e3b78f464e52b899bee7d923"
+            ).to(self.device)
         except Exception as e:
             raise SOAPGenerationError(f"Failed to load BioGPT model: {e}") from e
 

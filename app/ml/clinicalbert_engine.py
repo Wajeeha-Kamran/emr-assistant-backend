@@ -69,10 +69,10 @@ class ClinicalBERTEngine:
 
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(
-                "emilyalsentzer/Bio_ClinicalBERT"
+                "emilyalsentzer/Bio_ClinicalBERT", revision="d5892b39a4adaed74b92212a44081509db72f87b"
             )
             self.model = AutoModel.from_pretrained(
-                "emilyalsentzer/Bio_ClinicalBERT"
+                "emilyalsentzer/Bio_ClinicalBERT", revision="d5892b39a4adaed74b92212a44081509db72f87b"
             ).to(self.device)
         except Exception as e:
             raise RuntimeError(f"Failed to load ClinicalBERT model: {e}") from e

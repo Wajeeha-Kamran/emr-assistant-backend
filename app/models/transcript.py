@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Enum, ForeignKey, Integer, String, Float, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.core.encrypted_type import EncryptedText
 
 class TranscriptStatus(str, enum.Enum):
     processing = "processing"
@@ -27,7 +28,7 @@ class TranscriptSegment(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     transcript_id: Mapped[int] = mapped_column(ForeignKey("transcripts.id"), nullable=False)
     speaker_role: Mapped[str] = mapped_column(String, nullable=False)  # "DOCTOR" or "PATIENT"
-    text: Mapped[str] = mapped_column(String, nullable=False)
+    text: Mapped[str] = mapped_column(EncryptedText, nullable=False)
     start_time: Mapped[float | None] = mapped_column(Float, nullable=True)
     end_time: Mapped[float | None] = mapped_column(Float, nullable=True)
 

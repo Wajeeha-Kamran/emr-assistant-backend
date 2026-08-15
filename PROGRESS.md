@@ -40,7 +40,7 @@
 - [x] Module 7.1 — Automated Retention/Cleanup Job
 
 ## PHASE 8 — Security, Reliability & Performance Hardening
-- [ ] Module 8.1 — Security Hardening
+- [x] Module 8.1 — Security Hardening
 - [x] **Module 8.2:** Error Handling, Resilience & Observability
   - Implement robust error surfacing (timeout wrappers, fast failure)
   - Light-weight metrics telemetry (success/failure rates)

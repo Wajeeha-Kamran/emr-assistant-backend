@@ -94,9 +94,10 @@ class EMRSyncClient:
                             
                             if response.is_error:
                                 if 400 <= response.status_code < 500:
-                                    # Fail fast on 4xx
-                                    response_text_safe = response.text[:200] + "..." if len(response.text) > 200 else response.text
-                                    logger.error(f"EMR sync 4xx error for note {note_id}: {response.status_code} - {response_text_safe}")
+                                    # Fail fast on 4xx — log status code and body length only.
+                                    # Response body may contain clinical text (e.g. FastAPI 422
+                                    # echoes the offending input value), so never log its content.
+                                    logger.error(f"EMR sync 4xx error for note {note_id}: {response.status_code} (body {len(response.text)} chars)")
                                     break
                                 
                             response.raise_for_status()

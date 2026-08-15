@@ -16,3 +16,6 @@ openai-whisper
 transformers
 sacremoses
 apscheduler
+cryptography>=50.0.0
+bandit
+pip-audit

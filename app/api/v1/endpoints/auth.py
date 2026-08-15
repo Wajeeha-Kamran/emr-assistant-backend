@@ -46,7 +46,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     access_token = create_access_token(
         subject=doctor.email, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    # False positive: 'bearer' is the standard OAuth2 token_type string, not a hardcoded credential.
+    return {"access_token": access_token, "token_type": "bearer"}  # nosec B105
 
 @router.get("/me", response_model=DoctorResponse)
 def read_users_me(current_doctor: Doctor = Depends(get_current_doctor)):
