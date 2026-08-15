@@ -57,8 +57,39 @@
 
 ## PHASE 9 — Testing, QA & API Documentation
 - [ ] Module 9.1 — Full pytest Suite Mapped to TC-01…TC-10
-  - Part B (diarization accuracy vs the 85% NFR) requires labelled two-speaker
-    mock consultation recordings. Highest-value remaining measurement.
+  - [x] Part A — tests reorganised to TC-01…TC-10 with a dedicated test DB
+        - 107 passed, 0 failed (15 Aug 2026). 90 tests mapped across
+          TC-01…TC-10, all green; 17 supporting (auth, NFRs, infrastructure)
+        - Tests now run against emr_assistant_test, created and seeded
+          automatically. Guard refuses any database not ending in "_test".
+          Fixes tests failing while the app is running.
+        - pytest.ini restricts collection to tests/. scratch/ contained ten
+          files matching test_*.py that were previously being collected.
+        - The suite prints an STD traceability table at the end of every run,
+          so the evidence is generated rather than transcribed.
+        - Full write-up: docs/traceability.md
+        - KNOWN GAP: tests/integration/test_diarization.py calls
+          diarize_segments() without an audio path, so it exercises the
+          deprecated pause heuristic rather than pyannote. Accuracy is
+          measured properly by scripts/evaluate_accuracy.py, but these tests
+          should use a short fixture recording. See docs/traceability.md.
+  - [x] Part B — ASR and diarization accuracy measured against the 85% NFR
+        - ASR word accuracy 92.1% on human recordings — MET
+        - Diarization measured under three conditions:
+            similar voices (siblings)        35.9%  — 1 of 4 scripts met
+            distinct voices (F doctor/M pt)  77.6%  — 3 of 4 scripts met
+            synthetic control                99.9%  — 4 of 4 scripts met
+          Mean on the primary (distinct-voice) condition does not meet the 85%
+          target, but three of four consultations scored 97.5%+. The single
+          failure is script 2, deliberately recorded as a rapid exchange with
+          almost no gap between turns. Voice similarity and rapid turn-taking
+          are established as the limiting factors; the implementation is not.
+        - Diarization rebuilt: pause heuristic -> per-segment fingerprints ->
+          sliding-window fingerprints -> pyannote.audio. Speaker naming moved
+          from "first word wins" to a question-count majority vote.
+        - Full write-up: docs/module_9_1_accuracy.md
+  - [x] Part B follow-up — all four scripts re-recorded with a female doctor
+        and male patient, in docs/evidence/human_distinct/. Done 15 Aug 2026.
 - [ ] Module 9.2 — Postman Collection
 - [ ] Module 9.3 — OpenAPI Docs + README
 

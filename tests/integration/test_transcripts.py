@@ -35,7 +35,13 @@ def mock_pipeline(monkeypatch):
             ]
         }
         
-    def mock_diarize(segments):
+    # Signature must track DiarizationService.diarize_segments, which gained an
+    # audio_path parameter when voice-based diarization replaced the pause
+    # heuristic. A mock with a stale signature does not fail loudly — the real
+    # call raises TypeError inside the background task, the transcript is marked
+    # "failed", and the test reports a status mismatch that looks like a
+    # pipeline bug rather than a test-double that drifted.
+    def mock_diarize(segments, audio_path=None):
         return [
             {"start": 0.0, "end": 2.0, "text": "Hello doctor.", "speaker_role": "DOCTOR"},
             {"start": 4.0, "end": 6.0, "text": "Hi patient.", "speaker_role": "PATIENT"}
