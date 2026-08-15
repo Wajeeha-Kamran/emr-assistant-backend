@@ -31,7 +31,8 @@ TWO NUMBERS ARE REPORTED, and both matter.
   describe the pain for me?".
 
 Usage:
-    python -m scripts.evaluate_soap
+    python -m scripts.evaluate_soap              # the four reference scripts
+    python -m scripts.evaluate_soap --heldout    # unseen clinical scenarios
 """
 
 import os
@@ -42,6 +43,7 @@ from typing import Dict, List, Tuple
 EVIDENCE_DIR = os.path.join("docs", "evidence")
 SCRIPTS_MD = os.path.join(EVIDENCE_DIR, "consultation_scripts.md")
 EXPECTED_MD = os.path.join(EVIDENCE_DIR, "soap_expected.md")
+HELDOUT_MD = os.path.join(EVIDENCE_DIR, "soap_heldout.md")
 
 SECTION_OF_LABEL = {"O": "objective", "A": "assessment", "P": "plan"}
 WORD_RE = re.compile(r"[a-z0-9']+")
@@ -105,13 +107,32 @@ def parse_expected(path: str) -> Dict[int, List[Tuple[str, str]]]:
 def main() -> None:
     from app.services.soap_service import SOAPService
 
-    scripts = parse_scripts(SCRIPTS_MD)
-    expected = parse_expected(EXPECTED_MD)
+    heldout = "--heldout" in sys.argv[1:]
+
+    if heldout:
+        # The held-out file contains only labelled doctor sentences, so each one
+        # becomes its own segment. That isolates classification: sentence
+        # splitting is already exercised by the reference scripts, and what is
+        # under test here is whether the speech-act cues generalise beyond the
+        # consultations they were written against.
+        expected = parse_expected(HELDOUT_MD)
+        scripts = {
+            n: [{"speaker_role": "DOCTOR", "text": sentence}
+                for _, sentence in sentences]
+            for n, sentences in expected.items()
+        }
+        print("HELD-OUT SET — clinical scenarios absent from the reference "
+              "scripts.\nIf this scores far below the reference set, the "
+              "speech-act cues are fitted\nto the reference scripts and that "
+              "score cannot be trusted.\n")
+    else:
+        scripts = parse_scripts(SCRIPTS_MD)
+        expected = parse_expected(EXPECTED_MD)
 
     if not scripts or not expected:
         sys.exit("FATAL: nothing parsed.")
 
-    print(f"Scripts: {len(scripts)}   labelled sentences: "
+    print(f"Consultations: {len(scripts)}   labelled sentences: "
           f"{sum(len(v) for v in expected.values())}\n")
 
     clinical_right = clinical_total = 0

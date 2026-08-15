@@ -1,5 +1,13 @@
 # EMR Assistant Backend Progress
 
+**State as of 16 August 2026.** Phases 0–9 complete. Phase 10 not started.
+107 tests passing, all ten STD test cases green. Working tree clean.
+
+**Next up:** Phase 10 (Docker, CI, secrets, handoff package), then the .NET MAUI
+frontend. Full context for a cold start: `claude/EMR-Assistant-Backend-Handover.pdf`
+in the Claude project, or the `docs/module_*.md` write-ups in this repo.
+
+
 ## PHASE 0 — Environment & Core Bootstrap
 - [x] Module 0.1 — FastAPI App Skeleton & Config Management
 - [x] Module 0.2 — Database Connectivity (Two Logical Schemas)
@@ -57,25 +65,37 @@
 
 ## Module 3 revisit — SOAP classification quality (16 Aug 2026)
 - [x] Measured with scripts/evaluate_soap.py against 73 labelled doctor
-      sentences in docs/evidence/soap_expected.md
-      - Noise rate 100% -> 0%. The note no longer contains any greeting or
-        question. This is the large, unambiguous win.
-      - Clinical accuracy 74.4% -> 71.8%. Unchanged in real terms (one
-        sentence out of 39); do not report this as an improvement.
-      - Changes: sentence-level classification, filtering of questions /
-        announcements / pleasantries, reference anchors rebalanced to six
-        per category.
-- [ ] KNOWN LIMITATION: Assessment scores 1/5 and will not yield to anchor
-      tuning. ClinicalBERT's mean-pooled embedding captures what a sentence
-      is ABOUT, not what the speaker is DOING with it — diagnosing,
-      measuring and instructing are speech acts, and topic similarity cannot
-      separate them. Two routes: diagnostic-cue detection (must be written
-      from documentation conventions, not from the failing sentences), or a
-      supervised classifier trained on labelled SOAP sentences.
+      sentences in docs/evidence/soap_expected.md, plus a 56-sentence
+      held-out set in docs/evidence/soap_heldout.md
+
+                          baseline   stage 1   stage 2
+        clinical accuracy    74.4%     71.8%     97.4%
+        noise rate          100.0%      0.0%      0.0%
+        Assessment            0/5       1/5       5/5
+        Plan                 14/19     14/19     19/19
+
+      Held-out set (unseen clinical scenarios): 38/38, 0% noise.
+
+      - Stage 1: sentence-level classification, filtering of questions /
+        announcements / pleasantries, anchors rebalanced to six per
+        category. Solved noise; Assessment stayed broken, which proved
+        anchor tuning was not the answer.
+      - Stage 2: speech-act cues. Embeddings classify by topic; diagnosing,
+        measuring and instructing are speech acts that topic similarity
+        cannot separate. Hybrid: rules where the language is explicit,
+        embeddings where it is not.
+      - The held-out set exists to detect rules fitted to the reference
+        scripts. It scores ABOVE the reference set, so they are not
+        narrowly fitted. CAVEAT: the same author wrote both the cues and
+        the held-out sentences, so it tests generalisation across clinical
+        scenarios but not across phrasing styles.
+      - One error remains and was deliberately left: "You can bear weight,
+        just about." -> Plan. Writing a rule for a single visible failure
+        is the fitting this whole section guards against.
       Full write-up: docs/module_3_soap_classification.md
 
 ## PHASE 9 — Testing, QA & API Documentation
-- [ ] Module 9.1 — Full pytest Suite Mapped to TC-01…TC-10
+- [x] Module 9.1 — Full pytest Suite Mapped to TC-01…TC-10
   - [x] Part A — tests reorganised to TC-01…TC-10 with a dedicated test DB
         - 107 passed, 0 failed (15 Aug 2026). 90 tests mapped across
           TC-01…TC-10, all green; 17 supporting (auth, NFRs, infrastructure)
@@ -93,7 +113,9 @@
           measured properly by scripts/evaluate_accuracy.py, but these tests
           should use a short fixture recording. See docs/traceability.md.
   - [x] Part B — ASR and diarization accuracy measured against the 85% NFR
-        - ASR word accuracy 92.1% on human recordings — MET
+        - ASR word accuracy — MET under every condition measured:
+            similar voices 92.1%, distinct voices 86.4%, synthetic 95.3%
+          (target 85%, numeral-excluded figure)
         - Diarization measured under three conditions:
             similar voices (siblings)        35.9%  — 1 of 4 scripts met
             distinct voices (F doctor/M pt)  77.6%  — 3 of 4 scripts met
@@ -118,13 +140,22 @@
       2. transcript segments returned in arbitrary order
       3. finalized_at not cleared on transcript retry
   - Runbook and findings: docs/module_9_2_postman_runbook.md
-  - FINDING FOR MODULE 3 (not fixed): SOAP classification of doctor speech
-    into Objective/Assessment/Plan is poor because it runs per Whisper
-    segment. One 30s segment held examination + diagnosis + plan and all of
-    it landed in Objective; Assessment came back empty; a greeting landed in
-    Plan. Fix is sentence-level classification in soap_service.py. Needs
-    measuring after the change. Subjective is now correct.
-- [ ] Module 9.3 — OpenAPI Docs + README
+  - FINDING FOR MODULE 3 — RAISED HERE, NOW FIXED. SOAP classification of
+    doctor speech into Objective/Assessment/Plan was poor: one 30s segment
+    held examination + diagnosis + plan and all of it landed in Objective,
+    Assessment came back empty, and a greeting landed in Plan. Measured,
+    then fixed in two stages — see "Module 3 revisit" above. Clinical
+    accuracy 74.4% -> 97.4%, noise 100% -> 0%, Assessment 0/5 -> 5/5.
+- [x] Module 9.3 — OpenAPI Docs + README
+  - README.md written: setup, the three gated Hugging Face licences pyannote
+    needs, running both services, the test suite and its per-test-case
+    markers, the measurement scripts, architecture, and measured limitations.
+  - Every endpoint documented. FastAPI renders function docstrings into
+    /docs, so the descriptions cover what an integrator needs: transcription
+    is asynchronous and must be polled, ownership failures return 404 rather
+    than 403, signing is irreversible, the SOAP note is a draft for review.
+  - API description with the intended call order, plus descriptions for all
+    eight endpoint groups.
 
 ## PHASE 10 — Deployment Readiness
 - [ ] Module 10.1 — Containerization
@@ -137,8 +168,14 @@
       allow_origins=["*"]. Confirmed 16 Aug 2026; this entry was stale.
       NOTE for Module 10.3: "*" is a development setting. Restrict to the
       frontend's real origin before deployment.
+- [ ] Fix tests/integration/test_diarization.py to exercise the real path.
+      It calls diarize_segments() without an audio path, which selects the
+      deprecated pause heuristic, so five tests pass while testing code that
+      was proven not to work. Needs a short fixture recording. Noted inline
+      under Module 9.1 Part A; listed here so it is visible as open work.
 - [ ] BioGPT design-comparison script (scripts/soap_pipeline_comparison.py) —
       produces a report figure showing raw / hybrid / extractive output
-- [ ] ASR word-accuracy measurement vs the 85% NFR — never measured
+- [x] ASR word-accuracy measurement vs the 85% NFR — done in Module 9.1
+      Part B (15–16 Aug 2026). This entry was stale.
 - [ ] Optional: single GPU measurement (e.g. Google Colab) to evidence that the
       efficiency targets are hardware-bound rather than design-bound

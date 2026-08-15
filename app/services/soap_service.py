@@ -1,6 +1,6 @@
 import logging
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.ml.clinicalbert_engine import ClinicalBERTEngine, SOAPGenerationError
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,164 @@ _PLEASANTRY = re.compile(
     r"|see you|goodbye|bye)\b",
     re.I,
 )
+
+
+# ---------------------------------------------------------------------------
+# Speech-act cues
+# ---------------------------------------------------------------------------
+# WHY THESE EXIST
+# Embedding similarity classifies by TOPIC. "This looks like migraine with aura"
+# and "Your blood pressure is one forty over ninety" are both about blood
+# pressure and headache, so ClinicalBERT places them close together and both
+# land in Objective. Measured 16 Aug 2026: Assessment scored 1 of 5, and two
+# rounds of anchor rewriting did not move it.
+#
+# What separates them is not topic but SPEECH ACT — what the clinician is doing
+# with the topic. Diagnosing, measuring and instructing are different acts, and
+# each has recognisable surface forms in clinical language. These patterns
+# detect the act; the embedding model still handles everything with no clear
+# marker.
+#
+# The result is a hybrid: rules where the language is explicit, embeddings where
+# it is not. Neither alone was sufficient.
+#
+# HONESTY NOTE. These were written as families of clinical phrasing — hedged
+# diagnostic assertion, directive instruction, recorded observation — not by
+# reading the sentences that failed. Some inevitably match those sentences,
+# because that is what a diagnosis sounds like. The check against having fitted
+# them to the evaluation set is docs/evidence/soap_heldout.md: sentences from
+# clinical scenarios that appear nowhere in the reference scripts, scored
+# separately. If the rules only work on the scripts, that set will show it.
+
+_ASSESSMENT_CUES = [
+    # Hedged diagnostic assertion — the clinician naming what they think it is
+    r"\b(this|that|it)\s+(looks like|appears to be|sounds like|seems to be|seems like)\b",
+    r"\b(this|that)\s+is\s+(a|an)\b",
+    r"\bconsistent with\b",
+    r"\bsuggestive of\b",
+    r"\bin keeping with\b",
+    r"\bindicative of\b",
+    r"\bpoints to\b",
+    # Explicit diagnostic vocabulary
+    r"\b(diagnosis|impression)\b",
+    r"\bdiagnosed with\b",
+    r"\bdifferential\b",
+    r"\brule out\b",
+    r"\bcannot exclude\b",
+    # Probability judgements — a clinician weighing one explanation against another
+    r"\b(likely|unlikely|probable|probably)\b",
+    r"\bi (do not|don't|donot) think it is\b",
+    r"\bi think (this|that|it) is\b",
+    # Severity grading, which is part of naming a condition
+    r"\bgrade\s+(one|two|three|four|1|2|3|4)\b",
+    r"\bstage\s+(one|two|three|four|i{1,3}v?|1|2|3|4)\b",
+    r"\b(mild|moderate|severe|suboptimal|uncontrolled|well controlled)\b",
+]
+
+_PLAN_CUES = [
+    # Directive to the patient — an imperative opening the sentence
+    r"^(please\s+)?(take|rest|keep|start|stop|finish|continue|avoid|drink|apply|"
+    r"use|focus|book|call|bring|return|come back|carry on|monitor|elevate)\b",
+    # Clinician's stated intention
+    r"\bi (will|am going to|would like to|shall)\b",
+    r"\bwe (will|can) (arrange|book|review|repeat|check)\b",
+    # Follow-up and referral
+    r"\bfollow[\s-]?up\b",
+    r"\brefer(ral|red|ring)?\b",
+    r"\b(come back|review|repeat|recheck|seen again)\b.*\bin\b",
+    r"\bprescrib(e|ing|ed)\b",
+    # Safety netting — a conditional instruction about when to seek help
+    r"^if\b.*\b(come back|go to|seek|let me know|be seen|call|contact|emergency)\b",
+]
+
+_OBJECTIVE_CUES = [
+    # A recorded measurement
+    r"\b(blood pressure|temperature|weight|pulse|heart rate|hba1c|"
+    r"oxygen saturation|bmi|respiratory rate)\b.*\b(is|are|was|were|of|at)\b",
+    r"\b(has come back|came back|results? (show|shows|are))\b",
+    # An observation stated without interpretation
+    r"^(there (is|are)|no\b)",
+    r"\bexamination (shows|reveals|is|demonstrates)\b",
+    r"\bon examination\b",
+    r"\b(shows|reveals|demonstrates|palpation|auscultation)\b",
+]
+
+# Conditional instruction: a condition, then something the patient must do.
+_SAFETY_NET_RE = re.compile(
+    r"^if\b.*\b(come back|go to|seek|let me know|be seen|call|contact|"
+    r"attend|return|emergency|straight away|immediately)\b",
+    re.I,
+)
+
+_ASSESSMENT_RE = [re.compile(p, re.I) for p in _ASSESSMENT_CUES]
+_PLAN_RE = [re.compile(p, re.I) for p in _PLAN_CUES]
+_OBJECTIVE_RE = [re.compile(p, re.I) for p in _OBJECTIVE_CUES]
+
+
+def _cue_category(sentence: str) -> Optional[str]:
+    """
+    Return the section a sentence's speech act implies, or None if it has no
+    clear marker and should be left to the embedding classifier.
+
+    Assessment is tested first because it is the act the embedding model is
+    worst at recognising, and because a sentence that both names a diagnosis and
+    mentions a measurement ("This looks like migraine, and your blood pressure is
+    high") is doing the diagnosing — that is the clinically significant content.
+    Plan is tested before Objective for the same reason: "I will arrange an
+    X-ray" is an instruction that happens to mention an investigation.
+    """
+    text = sentence.strip()
+
+    # Safety-netting is checked before everything else. A conditional
+    # instruction -- "if X happens, do Y" -- is a directive to the patient
+    # whatever words appear inside the condition, so it belongs in Plan.
+    #
+    # Without this, "If the pain becomes suddenly severe, go to the emergency
+    # department" was filed under Assessment, because "severe" is a severity
+    # term and severity grading is part of naming a condition. Measured
+    # 16 Aug 2026: two of the three remaining errors on the reference set were
+    # exactly this. The held-out set happened to pass only because its
+    # safety-netting sentences use "crushing" rather than "severe" -- passing
+    # by luck of wording, which is not passing.
+    if _SAFETY_NET_RE.search(text):
+        return "plan"
+
+    for pattern in _ASSESSMENT_RE:
+        if pattern.search(text):
+            return "assessment"
+    for pattern in _PLAN_RE:
+        if pattern.search(text):
+            return "plan"
+    for pattern in _OBJECTIVE_RE:
+        if pattern.search(text):
+            return "objective"
+    return None
+
+
+def _apply_cues(
+    classified: Dict[str, List[str]], ordered_sentences: List[str]
+) -> Dict[str, List[str]]:
+    """
+    Re-route sentences whose speech act is explicit, leaving the rest where the
+    embedding classifier put them.
+
+    Applied after classification rather than instead of it, so the classifier
+    remains the default and this only overrides where the language is
+    unambiguous. Each section is then restored to the order the sentences were
+    spoken in, so a re-routed sentence does not end up appended out of sequence.
+    """
+    position = {text: i for i, text in enumerate(ordered_sentences)}
+    out: Dict[str, List[str]] = {"objective": [], "assessment": [], "plan": []}
+
+    for category, texts in classified.items():
+        if category not in out:
+            out[category] = []
+        for text in texts:
+            out[_cue_category(text) or category].append(text)
+
+    for category in out:
+        out[category].sort(key=lambda t: position.get(t, len(position)))
+    return out
 
 
 def _split_sentences(text: str) -> List[str]:
@@ -175,6 +333,10 @@ class SOAPService:
             raise SOAPGenerationError(
                 f"Doctor segment classification failed: {e}"
             ) from e
+
+        classified_docs = _apply_cues(
+            classified_docs, [d["text"] for d in doctor_segments]
+        )
 
         def _join_segments(texts: List[str]) -> str:
             if not texts:
