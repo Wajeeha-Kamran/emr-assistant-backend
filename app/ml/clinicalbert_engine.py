@@ -14,25 +14,50 @@ class SOAPGenerationError(Exception):
 # Hardcoded reference descriptions for zero-shot SOAP category classification.
 # Each category has 3 descriptions covering different angles of that section.
 REFERENCE_DESCRIPTIONS: Dict[str, List[str]] = {
+    # SIX ANCHORS PER CATEGORY, DELIBERATELY EQUAL.
+    #
+    # Classification takes the maximum cosine similarity across a category's
+    # anchors. A category with more anchors therefore gets more chances at a
+    # high maximum, which biases the result toward it for reasons that have
+    # nothing to do with the text being classified. An earlier revision on
+    # 16 Aug 2026 left Objective with 5, Assessment with 9 and Plan with 6, and
+    # Objective's accuracy fell from 100% to 66.7% as measurements drifted into
+    # the over-represented categories. Keep these counts equal.
+    #
+    # None of these sentences appears in docs/evidence/consultation_scripts.md.
+    # They describe what each section of a SOAP note contains, in general terms.
+    # Anchors copied from the evaluation text would score well and prove nothing.
     "subjective": [
         "Patient reports symptoms including pain, discomfort, and complaints.",
         "The patient describes their medical history, allergies, and current medications.",
         "Chief complaint and history of present illness as told by the patient.",
+        "What the patient says they are experiencing, in their own words.",
+        "Onset, duration, and character of the problem as reported by the patient.",
+        "The patient's account of how the problem affects them.",
     ],
     "objective": [
         "Physical examination findings including vital signs, temperature, blood pressure, and heart rate.",
         "Laboratory results, imaging findings, and diagnostic test results.",
         "Clinician observed signs during examination such as swelling, tenderness, and range of motion.",
+        "A measured value recorded during the examination.",
+        "What was seen, felt, or measured, stated without interpretation.",
+        "Recorded observations such as weight, temperature, and blood test values.",
     ],
     "assessment": [
         "Clinical diagnosis, differential diagnosis, and medical impression.",
         "Assessment of the patient condition based on subjective and objective findings.",
-        "Prognosis and severity evaluation of the identified condition.",
+        "The diagnosis is a specific named condition.",
+        "This appears to be a particular illness or injury.",
+        "The findings are consistent with a likely underlying cause.",
+        "The condition is graded or staged by severity.",
     ],
     "plan": [
         "Treatment plan including prescribed medications and dosages.",
         "Follow-up instructions, referrals, and recommended lifestyle changes.",
         "Planned diagnostic tests, procedures, and patient education.",
+        "An instruction to the patient about what to do next.",
+        "Safety-netting advice describing when to seek urgent help.",
+        "What will happen after this consultation.",
     ],
 }
 
