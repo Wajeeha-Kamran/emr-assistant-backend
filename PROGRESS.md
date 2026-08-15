@@ -41,14 +41,24 @@
 
 ## PHASE 8 — Security, Reliability & Performance Hardening
 - [x] Module 8.1 — Security Hardening
+  - Encryption at rest for clinical text (SQLAlchemy TypeDecorator + Fernet)
+  - TLS termination config for deployment (docker/nginx.conf)
+  - bandit + pip-audit integrated; two exceptions documented with reasoning
 - [x] **Module 8.2:** Error Handling, Resilience & Observability
   - Implement robust error surfacing (timeout wrappers, fast failure)
   - Light-weight metrics telemetry (success/failure rates)
   - Validate 95%+ success rate against test runs
-- [ ] Module 8.3 — Performance & Concurrency
+- [x] Module 8.3 — Performance & Concurrency
+  - Concurrency requirement MET (10/10 sessions) after fixing a Whisper
+    thread-safety fault; inference now serialised on a lock
+  - Timing requirements NOT met on CPU (~72s vs 15s target); measured, not
+    assumed. Celery/Redis evaluated and rejected on evidence.
+  - Full write-up: docs/module_8_3_performance.md
 
 ## PHASE 9 — Testing, QA & API Documentation
 - [ ] Module 9.1 — Full pytest Suite Mapped to TC-01…TC-10
+  - Part B (diarization accuracy vs the 85% NFR) requires labelled two-speaker
+    mock consultation recordings. Highest-value remaining measurement.
 - [ ] Module 9.2 — Postman Collection
 - [ ] Module 9.3 — OpenAPI Docs + README
 
@@ -57,3 +67,12 @@
 - [ ] Module 10.2 — Basic CI Pipeline
 - [ ] Module 10.3 — Environment Configuration & Secrets
 - [ ] Module 10.4 — Final Backend Review & Frontend Handoff Package
+
+## Additional tasks (not in the original roadmap)
+- [ ] CORS configuration — required before the Blazor web frontend; not needed
+      for the .NET MAUI mobile app
+- [ ] BioGPT design-comparison script (scripts/soap_pipeline_comparison.py) —
+      produces a report figure showing raw / hybrid / extractive output
+- [ ] ASR word-accuracy measurement vs the 85% NFR — never measured
+- [ ] Optional: single GPU measurement (e.g. Google Colab) to evidence that the
+      efficiency targets are hardware-bound rather than design-bound
