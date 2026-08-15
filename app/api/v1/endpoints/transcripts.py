@@ -77,8 +77,16 @@ def retry_transcription(
             detail="Transcription is already in progress"
         )
         
-    # Reset status to processing
+    # Reset status to processing.
+    #
+    # finalized_at must be cleared alongside it. Found during the Module 9.2
+    # manual API run on 15 Aug 2026: after a retry, GET .../transcript returned
+    # status "processing" while still carrying the completion timestamp from the
+    # previous attempt. A client would render "completed at 01:52" beside a
+    # spinner. Any field describing the outcome of a run is stale the moment a
+    # new run starts.
     transcript.status = TranscriptStatus.processing
+    transcript.finalized_at = None
     db.commit()
     
     background_tasks.add_task(ASRService.transcribe_and_diarize, session_id)

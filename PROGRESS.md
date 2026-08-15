@@ -90,7 +90,21 @@
         - Full write-up: docs/module_9_1_accuracy.md
   - [x] Part B follow-up — all four scripts re-recorded with a female doctor
         and male patient, in docs/evidence/human_distinct/. Done 15 Aug 2026.
-- [ ] Module 9.2 — Postman Collection
+- [x] Module 9.2 — Postman Collection
+  - All 19 requests run against a live server, 15 Aug 2026. Full workflow
+    verified end to end: register -> login -> session -> record -> transcribe
+    -> SOAP -> edit -> codes -> sign -> sync -> retention sweep.
+  - Found and fixed three defects the automated suite could not catch:
+      1. audio/wave rejected on upload (Windows clients, incl. .NET MAUI)
+      2. transcript segments returned in arbitrary order
+      3. finalized_at not cleared on transcript retry
+  - Runbook and findings: docs/module_9_2_postman_runbook.md
+  - FINDING FOR MODULE 3 (not fixed): SOAP classification of doctor speech
+    into Objective/Assessment/Plan is poor because it runs per Whisper
+    segment. One 30s segment held examination + diagnosis + plan and all of
+    it landed in Objective; Assessment came back empty; a greeting landed in
+    Plan. Fix is sentence-level classification in soap_service.py. Needs
+    measuring after the change. Subjective is now correct.
 - [ ] Module 9.3 — OpenAPI Docs + README
 
 ## PHASE 10 — Deployment Readiness

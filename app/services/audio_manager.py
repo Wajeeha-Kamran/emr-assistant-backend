@@ -6,10 +6,27 @@ from tinytag import TinyTag
 from app.core.config import settings
 from app.models.audio import AudioMetadata
 
+# WAV has never had one agreed MIME type. Windows reports "audio/wave",
+# browsers usually send "audio/wav", older tooling sends "audio/x-wav", and
+# "audio/vnd.wave" is the IANA registration. All four name the same format.
+#
+# Found during the Module 9.2 manual API run on 15 Aug 2026: uploading a .wav
+# from Windows was rejected with "Unsupported file type: audio/wave" while the
+# identical file passed from the test suite, which sets the header itself. The
+# automated tests could not have caught this — they never exercise a real
+# client's content-type negotiation. A .NET MAUI client on Windows would have
+# hit the same rejection.
 ALLOWED_CONTENT_TYPES = [
-    "audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp4", 
-    "audio/ogg", "audio/webm", "audio/x-m4a", "audio/mp3", 
-    "video/webm", "video/mp4"
+    # WAV, all spellings in circulation
+    "audio/wav", "audio/wave", "audio/x-wav", "audio/vnd.wave", "audio/x-pn-wav",
+    # MP3
+    "audio/mpeg", "audio/mp3",
+    # MP4 / M4A
+    "audio/mp4", "audio/x-m4a", "audio/m4a",
+    # Others
+    "audio/ogg", "audio/webm",
+    # Some clients upload recordings under a video container type
+    "video/webm", "video/mp4",
 ]
 
 class AudioManager:

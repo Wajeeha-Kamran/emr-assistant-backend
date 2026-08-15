@@ -1,0 +1,306 @@
+{
+  "info": {
+    "name": "AI-Powered EMR Assistant — Backend API",
+    "description": "Complete API collection for the AI-Powered EMR Assistant backend, organised in clinical workflow order (UC-01 through UC-09).\n\nSETUP\n1. Start PostgreSQL.\n2. Start the main app:            .\\.venv\\Scripts\\uvicorn.exe app.main:app\n3. Start the simulated EMR:       .\\.venv\\Scripts\\uvicorn.exe simulated_emr_service.main:app --port 8001\n4. Select the 'EMR Assistant — Local' environment, or use the collection variables below.\n\nRUNNING THE WHOLE WORKFLOW\nRun the requests top to bottom. Register and Login store the JWT automatically; every later request captures the ids it creates (session_id, note_id, section_id, suggestion_id) into collection variables, so no manual copying is required.\n\nNOTE ON TIMING\nTranscription runs in the background and takes roughly 3.5 seconds per 30 seconds of audio on CPU. After 'Stop Recording', poll 'Get Transcript' until status is 'completed' before generating a SOAP note.\n\nSTD MAPPING\nTC-01 Start Recording          -> 4. Start Recording\nTC-02 Stop Recording + Audio   -> 5. Stop Recording (Upload Audio)\nTC-06 Diarized Transcript      -> 6. Get Transcript\nTC-07 SOAP Draft Generated     -> 8. Generate SOAP Note\nTC-03 Edit Draft Saved         -> 10. Edit SOAP Section\nTC-08 Code Suggestions Ranked  -> 11/12. Generate / Get Code Suggestions\nTC-04 Note Signed and Locked   -> 14. Sign SOAP Note\nTC-09 Sync Success             -> 15. Get Sync Status\nTC-10 Sync Failure             -> stop the simulated EMR service, then sign a note\nTC-05 Retention Policy         -> 16. Trigger Retention Sweep",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8000", "type": "string" },
+    { "key": "emr_url", "value": "http://127.0.0.1:8001", "type": "string" },
+    { "key": "email", "value": "dr.demo@example.com", "type": "string" },
+    { "key": "password", "value": "password123", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "session_id", "value": "", "type": "string" },
+    { "key": "note_id", "value": "", "type": "string" },
+    { "key": "section_id", "value": "", "type": "string" },
+    { "key": "suggestion_id", "value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "0. Health Check",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] },
+        "description": "Confirms the API is up. Expects {\"status\": \"ok\"}."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('API is up', () => pm.response.to.have.status(200));"
+        ]}
+      }]
+    },
+    {
+      "name": "1. Register Doctor",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"full_name\": \"Dr Demo\"\n}" },
+        "url": { "raw": "{{base_url}}/api/v1/auth/register", "host": ["{{base_url}}"], "path": ["api","v1","auth","register"] },
+        "description": "Creates a doctor account. Returns 201. A duplicate email returns 400 — change the 'email' collection variable to re-run."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Created or already exists', () => pm.expect([201,400]).to.include(pm.response.code));"
+        ]}
+      }]
+    },
+    {
+      "name": "2. Login (stores JWT)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+        "body": { "mode": "urlencoded", "urlencoded": [
+          { "key": "username", "value": "{{email}}", "type": "text" },
+          { "key": "password", "value": "{{password}}", "type": "text" }
+        ]},
+        "url": { "raw": "{{base_url}}/api/v1/auth/login", "host": ["{{base_url}}"], "path": ["api","v1","auth","login"] },
+        "description": "OAuth2 password flow. Note this is form-encoded, not JSON. The returned access_token is stored in the 'token' variable and used by every subsequent request."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Login succeeded', () => pm.response.to.have.status(200));",
+          "const j = pm.response.json();",
+          "pm.collectionVariables.set('token', j.access_token);",
+          "pm.test('Token stored', () => pm.expect(j.access_token).to.be.a('string'));"
+        ]}
+      }]
+    },
+    {
+      "name": "3. Create Consultation Session",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{base_url}}/api/v1/sessions/", "host": ["{{base_url}}"], "path": ["api","v1","sessions",""] },
+        "description": "UC-01 precondition. Creates a session in state INITIATED, bound to the authenticated doctor."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Session created', () => pm.response.to.have.status(201));",
+          "const j = pm.response.json();",
+          "pm.collectionVariables.set('session_id', j.id);",
+          "pm.test('State is INITIATED', () => pm.expect(j.status).to.eql('INITIATED'));"
+        ]}
+      }]
+    },
+    {
+      "name": "4. Start Recording (TC-01)",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}/start-recording", "host": ["{{base_url}}"], "path": ["api","v1","sessions","{{session_id}}","start-recording"] },
+        "description": "UC-01. Transitions the session to RECORDING. Calling it twice, or on a session in the wrong state, returns a 4xx rather than a 500."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Recording started', () => pm.response.to.have.status(200));",
+          "pm.test('State is RECORDING', () => pm.expect(pm.response.json().status).to.eql('RECORDING'));"
+        ]}
+      }]
+    },
+    {
+      "name": "5. Stop Recording — Upload Audio (TC-02)",
+      "request": {
+        "method": "POST",
+        "body": { "mode": "formdata", "formdata": [
+          { "key": "file", "type": "file", "src": [], "description": "Select a .wav/.m4a/.mp3 file. Accepted content types: audio/wav, audio/mpeg, audio/mp4, audio/x-m4a, audio/ogg, audio/webm. Max duration 30 minutes." }
+        ]},
+        "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}/stop-recording", "host": ["{{base_url}}"], "path": ["api","v1","sessions","{{session_id}}","stop-recording"] },
+        "description": "UC-02, FR-01. Uploads the consultation audio, stores its metadata, moves the session to STOPPED, and triggers background transcription.\n\nYOU MUST ATTACH A FILE: open the Body tab and select an audio file for the 'file' field. docs/evidence/load_clip.wav works."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Upload accepted', () => pm.response.to.have.status(200));",
+          "pm.test('State is STOPPED', () => pm.expect(pm.response.json().status).to.eql('STOPPED'));"
+        ]}
+      }]
+    },
+    {
+      "name": "6. Get Transcript — poll until completed (TC-06)",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}/transcript", "host": ["{{base_url}}"], "path": ["api","v1","sessions","{{session_id}}","transcript"] },
+        "description": "UC-06, FR-02. Returns the diarized transcript. Status moves from 'processing' to 'completed'.\n\nRe-send this request until status is 'completed'. Roughly 3.5 seconds per 30 seconds of audio on CPU. Every segment must carry a speaker_role of DOCTOR or PATIENT."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Transcript retrieved', () => pm.response.to.have.status(200));",
+          "const j = pm.response.json();",
+          "if (j.status === 'completed') {",
+          "  pm.test('At least one segment', () => pm.expect(j.segments.length).to.be.above(0));",
+          "  pm.test('Every segment has a speaker role', () =>",
+          "    j.segments.forEach(s => pm.expect(['DOCTOR','PATIENT']).to.include(s.speaker_role)));",
+          "} else {",
+          "  console.log('Status is ' + j.status + ' — send this request again.');",
+          "}"
+        ]}
+      }]
+    },
+    {
+      "name": "7. Retry Transcription (UC-06 alternate flow)",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}/transcript/retry", "host": ["{{base_url}}"], "path": ["api","v1","sessions","{{session_id}}","transcript","retry"] },
+        "description": "UC-06 alternate flow: ASR failed. Re-runs transcription for this session. Only needed if step 6 reported status 'failed'."
+      }
+    },
+    {
+      "name": "8. Generate SOAP Note (TC-07)",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}/soap-notes/generate", "host": ["{{base_url}}"], "path": ["api","v1","sessions","{{session_id}}","soap-notes","generate"] },
+        "description": "UC-07, FR-03. Builds the SOAP draft from the transcript.\n\nPipeline is extractive, not generative: PATIENT segments go to SUBJECTIVE deterministically; DOCTOR segments are classified into OBJECTIVE / ASSESSMENT / PLAN by ClinicalBERT. Empty categories fall back to 'Not documented in dialogue.' Exactly four sections are always produced."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('SOAP note created', () => pm.response.to.have.status(201));",
+          "const j = pm.response.json();",
+          "pm.collectionVariables.set('note_id', j.id);",
+          "pm.test('Exactly four sections', () => pm.expect(j.sections.length).to.eql(4));",
+          "pm.test('Status is DRAFT', () => pm.expect(j.status).to.eql('DRAFT'));",
+          "if (j.sections.length) pm.collectionVariables.set('section_id', j.sections[0].id);"
+        ]}
+      }]
+    },
+    {
+      "name": "9. Get SOAP Note",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}/soap-notes", "host": ["{{base_url}}"], "path": ["api","v1","sessions","{{session_id}}","soap-notes"] },
+        "description": "Retrieves the SOAP note for this session, with all four sections. Section content is encrypted at rest and decrypted transparently on read."
+      }
+    },
+    {
+      "name": "10. Edit SOAP Section (TC-03)",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"content\": \"Patient reports a four-day history of right-sided throbbing headache with photophobia and visual aura.\"\n}" },
+        "url": { "raw": "{{base_url}}/api/v1/soap-notes/{{note_id}}/sections/{{section_id}}", "host": ["{{base_url}}"], "path": ["api","v1","soap-notes","{{note_id}}","sections","{{section_id}}"] },
+        "description": "UC-03, FR-05. The doctor edits a section. Updates last_edited_at. Rejected with 409 once the note is SIGNED — try re-sending this after step 14 to confirm immutability."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Edit accepted (or 409 if already signed)', () => pm.expect([200,409]).to.include(pm.response.code));"
+        ]}
+      }]
+    },
+    {
+      "name": "11. Generate Code Suggestions (TC-08)",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{base_url}}/api/v1/soap-notes/{{note_id}}/code-suggestions/generate", "host": ["{{base_url}}"], "path": ["api","v1","soap-notes","{{note_id}}","code-suggestions","generate"] },
+        "description": "UC-08, FR-04. Two independent semantic searches: the ASSESSMENT section against ICD-10 codes only, and the PLAN section against CPT codes only. Results are merged with sequential gap-free ranks, ICD-10 first.\n\nRegenerating on a DRAFT replaces existing suggestions. Regenerating on a SIGNED note returns 409."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Suggestions generated', () => pm.response.to.have.status(200));",
+          "const j = pm.response.json();",
+          "if (j.length) pm.collectionVariables.set('suggestion_id', j[0].id);",
+          "pm.test('Ranks are sequential from 1', () =>",
+          "  j.forEach((s,i) => pm.expect(s.rank).to.eql(i+1)));"
+        ]}
+      }]
+    },
+    {
+      "name": "12. Get Code Suggestions",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/v1/soap-notes/{{note_id}}/code-suggestions", "host": ["{{base_url}}"], "path": ["api","v1","soap-notes","{{note_id}}","code-suggestions"] },
+        "description": "Returns the stored suggestions ordered by rank, each with code, description, code_type, confidence_score and accepted flag."
+      }
+    },
+    {
+      "name": "13. Accept a Code Suggestion (UC-08 accept/remove)",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"accepted\": true\n}" },
+        "url": { "raw": "{{base_url}}/api/v1/soap-notes/{{note_id}}/code-suggestions/{{suggestion_id}}", "host": ["{{base_url}}"], "path": ["api","v1","soap-notes","{{note_id}}","code-suggestions","{{suggestion_id}}"] },
+        "description": "UC-08 requires suggestions to be reviewable and editable. Sets accepted true or false. Only accepted codes are sent to the EMR on sync. Rejected with 409 once the note is signed."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Acceptance recorded', () => pm.response.to.have.status(200));",
+          "pm.test('Flag is true', () => pm.expect(pm.response.json().accepted).to.eql(true));"
+        ]}
+      }]
+    },
+    {
+      "name": "14. Sign SOAP Note (TC-04)",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{base_url}}/api/v1/soap-notes/{{note_id}}/sign", "host": ["{{base_url}}"], "path": ["api","v1","soap-notes","{{note_id}}","sign"] },
+        "description": "UC-04, FR-06. Creates a Signature, sets the note to SIGNED, sets sync_status to PENDING, and queues EMR synchronisation as a background task.\n\nSigning twice returns 409 — prevented at database level by a unique constraint."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Signed (or 409 if already signed)', () => pm.expect([201,409]).to.include(pm.response.code));"
+        ]}
+      }]
+    },
+    {
+      "name": "15. Get Sync Status (TC-09 / TC-10)",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/v1/soap-notes/{{note_id}}/sync-status", "host": ["{{base_url}}"], "path": ["api","v1","soap-notes","{{note_id}}","sync-status"] },
+        "description": "UC-09, FR-07. Returns PENDING, SUCCESS or FAILED.\n\nTC-09: with the simulated EMR running on port 8001, expect SUCCESS within a second or two.\nTC-10: stop the simulated EMR service, sign a different note, and expect FAILED — the signed note and its signature must remain intact."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status retrieved', () => pm.response.to.have.status(200));",
+          "console.log('sync_status = ' + pm.response.json().sync_status);"
+        ]}
+      }]
+    },
+    {
+      "name": "16. Trigger Retention Sweep (TC-05, dev only)",
+      "request": {
+        "method": "POST",
+        "url": { "raw": "{{base_url}}/api/v1/admin/retention/sweep", "host": ["{{base_url}}"], "path": ["api","v1","admin","retention","sweep"] },
+        "description": "UC-05, FR-08. Development aid: runs the retention sweep on demand instead of waiting for the scheduler.\n\nAudio is only deleted when the note is SIGNED, sync_status is SUCCESS, the flag is older than RETENTION_WINDOW_MINUTES (4), and it has not already been deleted. The signed note, its signature and the transcript are never touched."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Sweep ran', () => pm.response.to.have.status(200));",
+          "console.log('deleted_count = ' + pm.response.json().deleted_count);"
+        ]}
+      }]
+    },
+    {
+      "name": "17. Current Doctor (whoami)",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{base_url}}/api/v1/auth/me", "host": ["{{base_url}}"], "path": ["api","v1","auth","me"] },
+        "description": "Returns the authenticated doctor. Useful for confirming the JWT is valid. Without a token this returns 401."
+      }
+    },
+    {
+      "name": "18. Simulated EMR — List Received Records",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "url": { "raw": "{{emr_url}}/docs", "host": ["{{emr_url}}"], "path": ["docs"] },
+        "description": "The simulated EMR service exposes only POST /simulated-emr/records, which the sync client calls; there is no list endpoint. This request opens its interactive docs page instead.\n\nTo verify a note arrived, query the database directly:\n  psql -U postgres -d simulated_emr -c \"SELECT id, source_session_id, source_soap_note_id, received_at FROM simulated_emr_records ORDER BY id DESC LIMIT 5;\""
+      }
+    }
+  ]
+}

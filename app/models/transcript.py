@@ -20,7 +20,25 @@ class Transcript(Base):
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     session = relationship("ConsultationSession", back_populates="transcript")
-    segments = relationship("TranscriptSegment", back_populates="transcript", cascade="all, delete-orphan")
+    # order_by is not cosmetic. Without it PostgreSQL returns rows in whatever
+    # order it finds them, which is not insertion order and not stable. Found
+    # during the Module 9.2 manual API run on 15 Aug 2026: GET .../transcript
+    # returned the segment starting at 38.12s first, ahead of the one starting
+    # at 0.64s.
+    #
+    # A client rendering that list shows the consultation out of sequence.
+    # SOAP generation is unaffected: soap_note_service.py already applies its
+    # own .order_by(TranscriptSegment.start_time) when it reads segments.
+    #
+    # Ordering here rather than in the endpoint means every consumer inherits
+    # it, including anything added later that forgets to sort — which is how
+    # this defect reached the API response in the first place.
+    segments = relationship(
+        "TranscriptSegment",
+        back_populates="transcript",
+        cascade="all, delete-orphan",
+        order_by="TranscriptSegment.start_time",
+    )
 
 class TranscriptSegment(Base):
     __tablename__ = "transcript_segments"
