@@ -8,3 +8,8 @@ models/
 docs/evidence/synthetic/parts/
 docs/evidence/consult_*.wav
 docs/evidence/diarized_output.txt
+
+# Throwaway experiments. Kept on disk because they record what was
+# tried, but not part of the project's history — pytest already skips
+# them via norecursedirs.
+scratch/

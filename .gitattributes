@@ -1,0 +1,20 @@
+# Line endings.
+#
+# Without this file, git stores whatever bytes the working tree happens to
+# contain. A file rewritten by a different editor then shows as every line
+# changed, which buries real edits: on 16 Aug 2026 `git status` listed 24
+# modified files, of which 15 had actually changed and 9 differed only by
+# carriage returns.
+#
+# text=auto stores every text file with LF in the repository and checks it out
+# with the platform's own endings, so Windows editors keep working and the
+# history stays clean.
+* text=auto
+
+# Never transformed. Rewriting line endings inside these corrupts them.
+*.png binary
+*.jpg binary
+*.wav binary
+*.pdf binary
+*.ttf binary
+*.pyc binary
