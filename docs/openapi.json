@@ -52,7 +52,7 @@
           "auth"
         ],
         "summary": "Register",
-        "description": "Register a new doctor account.\n\nThe email must be unique; a duplicate returns 400. The password is hashed\nbefore storage and is never returned by any endpoint.\n\nRegistration does not log you in — call /login next to obtain a token.",
+        "description": "Register a new doctor account.\n\nThe email must be unique; a duplicate returns 400. It must also look like an\naddress, the name must not be blank, and the password must be at least 8\ncharacters — a malformed body returns 422. Surrounding whitespace on the\nemail and name is trimmed, because an address stored with a trailing space\ncould never be logged into: the login lookup is an exact match.\n\nThose rules apply to registration only. Sign-in does not re-check them, so\naccounts created before they existed continue to work.\n\nThe password is hashed before storage and is never returned by any endpoint.\n\nRegistration does not log you in — call /login next to obtain a token.",
         "operationId": "register_api_v1_auth_register_post",
         "requestBody": {
           "content": {
@@ -94,7 +94,7 @@
           "auth"
         ],
         "summary": "Login",
-        "description": "Exchange email and password for a bearer token.\n\nSend as form data (`username` and `password`), not JSON — this follows the\nOAuth2 password flow so that interactive API docs can authorise directly.\nThe `username` field takes the doctor's email address.\n\nPass the returned token as `Authorization: Bearer <token>` on every other\nendpoint.",
+        "description": "Exchange email and password for a bearer token.\n\nSend as form data (`username` and `password`), not JSON — this follows the\nOAuth2 password flow so that interactive API docs can authorise directly.\nThe `username` field takes the doctor's email address, matched without\nregard to capitalisation or surrounding whitespace.\n\nThe password is matched exactly. Only the address is an identifier.\n\nPass the returned token as `Authorization: Bearer <token>` on every other\nendpoint.",
         "operationId": "login_api_v1_auth_login_post",
         "requestBody": {
           "content": {
@@ -772,7 +772,7 @@
           "emr_sync"
         ],
         "summary": "Get Sync Status",
-        "description": "Report the status of the background sync to the external EMR.\n\nSigning queues the sync; it does not complete synchronously. Poll here.\nA failed sync leaves the note intact and the session's audio undeleted, so\nnothing is lost and the sync can be retried.",
+        "description": "Report the status of the background sync to the external EMR.\n\nSigning queues the sync; it does not complete synchronously. Poll here.\n\nA failed sync leaves the note and its signature intact and leaves the\nsession's audio undeleted, so nothing is lost. It does not recover on its\nown: a FAILED note is never re-sent unless POST /{note_id}/retry-sync is\ncalled.",
         "operationId": "get_sync_status_api_v1_soap_notes__note_id__sync_status_get",
         "security": [
           {
@@ -814,6 +814,81 @@
         }
       }
     },
+    "/api/v1/soap-notes/{note_id}/retry-sync": {
+      "post": {
+        "tags": [
+          "emr_sync"
+        ],
+        "summary": "Retry Sync",
+        "description": "Re-queue a sync that failed.\n\nOnly a note whose sync_status is FAILED may be retried; anything else\nreturns 409. PENDING is refused deliberately — a job already in flight\nwould otherwise be duplicated, and the receiving EMR would store the same\nconsultation twice.\n\nEMRSyncClient already makes three attempts with backoff inside a single\njob. This endpoint is for the case where all three were exhausted and the\njob ended. Without it a FAILED note can never reach the EMR, and because\nthe retention worker requires sync_status == SUCCESS before deleting audio,\nthe consultation recording would also remain on disk indefinitely.\n\nThe note is set back to PENDING and the same background job signing uses is\nqueued again. The response reports PENDING, not the outcome; poll\n/{note_id}/sync-status for that.",
+        "operationId": "retry_sync_api_v1_soap_notes__note_id__retry_sync_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Note Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/attention": {
+      "get": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "Consultations that did not complete",
+        "description": "List the current doctor's consultations that are stuck, so the client can\noffer a way back into each one.\n\nThis is an exception list, not a work queue. Under normal use it is empty.\n\nA consultation runs record -> transcribe -> generate note -> sign -> sync.\nAny stage can be interrupted, and none recovers on its own, so each has a\nreason here and a recovery action:\n\n| reason | what happened | action |\n|---|---|---|\n| TRANSCRIPT_FAILED | Transcription errored or exceeded its time budget | RESUME_TRANSCRIPTION |\n| TRANSCRIPT_STALLED | Still `processing` past the point where the job could be running — the process died mid-job | RESUME_TRANSCRIPTION |\n| NOTE_NOT_GENERATED | Transcript ready, note never generated | GENERATE_NOTE |\n| NOT_SIGNED | Note drafted, never signed | SIGN_NOTE |\n| SYNC_FAILED | Signed, but the push to the EMR failed and nothing re-sends it | RETRY_SYNC |\n\nSigning never appears: it is synchronous, so a failure is returned to the\ncaller and nothing is written.\n\nBeyond letting the doctor finish the consultation, this list is how the\nsystem stops accumulating recordings. Audio is deleted only when its note\nis both SIGNED and SUCCESS, so every consultation stuck at any stage above\nkeeps a recording of a patient's voice on disk indefinitely.\n\nTwo exclusions are deliberate. A note or transcript younger than\nATTENTION_GRACE_MINUTES is not reported, so work in progress never appears\nin its own author's attention list. A session whose recording was started\nbut never stopped is not reported either — no audio was stored and no\ntranscript exists, so there is nothing to resume and nothing to clean up.\n\nEvery item carries session_id, which is what the client navigates with: the\ntranscript and the note are both fetched by session.",
+        "operationId": "list_attention_items_api_v1_attention_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttentionResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/admin/retention/sweep": {
       "post": {
         "tags": [
@@ -842,6 +917,111 @@
   },
   "components": {
     "schemas": {
+      "AttentionAction": {
+        "type": "string",
+        "enum": [
+          "RESUME_TRANSCRIPTION",
+          "GENERATE_NOTE",
+          "SIGN_NOTE",
+          "RETRY_SYNC"
+        ],
+        "title": "AttentionAction",
+        "description": "What the client should offer for a stuck consultation.\n\nIncluded so the recovery path is decided in one place rather than\nre-derived from `reason` in every client."
+      },
+      "AttentionItem": {
+        "properties": {
+          "session_id": {
+            "type": "integer",
+            "title": "Session Id"
+          },
+          "note_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note Id"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/AttentionReason"
+          },
+          "action": {
+            "$ref": "#/components/schemas/AttentionAction"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_edited_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Edited At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "session_id",
+          "reason",
+          "action",
+          "created_at"
+        ],
+        "title": "AttentionItem"
+      },
+      "AttentionReason": {
+        "type": "string",
+        "enum": [
+          "TRANSCRIPT_FAILED",
+          "TRANSCRIPT_STALLED",
+          "NOTE_NOT_GENERATED",
+          "NOT_SIGNED",
+          "SYNC_FAILED"
+        ],
+        "title": "AttentionReason",
+        "description": "Why a consultation did not finish.\n\nThese are the only persistent stuck states the system has. Each one leaves\nthe consultation's audio on disk permanently, because the retention worker\ndeletes audio only when the note is both SIGNED and SUCCESS.\n\nSigning itself never appears here: it is synchronous, so a failure is\nreported to the caller and nothing is written."
+      },
+      "AttentionResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AttentionItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/AttentionReason"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "count",
+          "counts"
+        ],
+        "title": "AttentionResponse"
+      },
       "Body_login_api_v1_auth_login_post": {
         "properties": {
           "grant_type": {
@@ -999,7 +1179,8 @@
           "full_name",
           "password"
         ],
-        "title": "DoctorCreate"
+        "title": "DoctorCreate",
+        "description": "Registration input.\n\nThe validators live here rather than on DoctorBase on purpose. DoctorBase\nis also the parent of DoctorResponse, which is built from rows already in\nthe database — validating there would mean an account created before these\nrules existed could no longer be read back, turning a historical input\nproblem into a permanent read failure.\n\nValidate what comes in. Never validate what goes out."
       },
       "DoctorResponse": {
         "properties": {
@@ -1484,6 +1665,10 @@
     {
       "name": "emr_sync",
       "description": "Status of the background push to the external EMR, triggered by signing."
+    },
+    {
+      "name": "attention",
+      "description": "Consultations that did not complete — unsigned notes and failed EMR syncs. Empty under normal use."
     },
     {
       "name": "retention",

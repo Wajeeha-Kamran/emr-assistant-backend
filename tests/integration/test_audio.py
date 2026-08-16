@@ -13,8 +13,8 @@ def mock_tinytag_get(duration):
 def test_stop_recording_happy_path(client, monkeypatch):
     monkeypatch.setattr(TinyTag, 'get', mock_tinytag_get(120.5)) # 2 minutes
     
-    client.post("/api/v1/auth/register", json={"email": "doc_audio@example.com", "full_name": "Audio Doc", "password": "pwd"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_audio@example.com", "full_name": "Audio Doc", "password": "testpassword"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio@example.com", "password": "testpassword"})
     token = login_resp.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
@@ -34,8 +34,8 @@ def test_stop_recording_happy_path(client, monkeypatch):
 def test_stop_recording_duration_limit(client, monkeypatch):
     monkeypatch.setattr(TinyTag, 'get', mock_tinytag_get(1900.0)) # > 30 mins
     
-    client.post("/api/v1/auth/register", json={"email": "doc_audio_dur@example.com", "full_name": "Audio Dur Doc", "password": "pwd"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_dur@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_audio_dur@example.com", "full_name": "Audio Dur Doc", "password": "testpassword"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_dur@example.com", "password": "testpassword"})
     token = login_resp.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
@@ -51,8 +51,8 @@ def test_stop_recording_duration_limit(client, monkeypatch):
     assert "exceeds maximum allowed duration" in stop_resp.json()["detail"]
 
 def test_stop_recording_invalid_type(client):
-    client.post("/api/v1/auth/register", json={"email": "doc_audio_type@example.com", "full_name": "Audio Type Doc", "password": "pwd"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_type@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_audio_type@example.com", "full_name": "Audio Type Doc", "password": "testpassword"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_type@example.com", "password": "testpassword"})
     token = login_resp.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
@@ -69,8 +69,8 @@ def test_stop_recording_invalid_type(client):
 
 def test_stop_recording_invalid_state(client, monkeypatch):
     monkeypatch.setattr(TinyTag, 'get', mock_tinytag_get(120.0))
-    client.post("/api/v1/auth/register", json={"email": "doc_audio_state@example.com", "full_name": "Audio State Doc", "password": "pwd"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_state@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_audio_state@example.com", "full_name": "Audio State Doc", "password": "testpassword"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_state@example.com", "password": "testpassword"})
     token = login_resp.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
@@ -86,8 +86,8 @@ def test_stop_recording_invalid_state(client, monkeypatch):
 
 def test_stop_recording_too_long(client, monkeypatch):
     monkeypatch.setattr(TinyTag, 'get', mock_tinytag_get(1801.0))
-    client.post("/api/v1/auth/register", json={"email": "doc_audio_long@example.com", "full_name": "Audio Long Doc", "password": "pwd"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_long@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_audio_long@example.com", "full_name": "Audio Long Doc", "password": "testpassword"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_audio_long@example.com", "password": "testpassword"})
     token = login_resp.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})

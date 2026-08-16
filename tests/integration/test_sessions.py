@@ -6,11 +6,11 @@ from app.db.session import SessionLocal
 def test_create_session(client):
     client.post(
         "/api/v1/auth/register",
-        json={"email": "doc_session@example.com", "full_name": "Session Doc", "password": "pwd"}
+        json={"email": "doc_session@example.com", "full_name": "Session Doc", "password": "testpassword"}
     )
     login_resp = client.post(
         "/api/v1/auth/login",
-        data={"username": "doc_session@example.com", "password": "pwd"}
+        data={"username": "doc_session@example.com", "password": "testpassword"}
     )
     token = login_resp.json()["access_token"]
     
@@ -37,11 +37,11 @@ def test_create_session_unauthorized(client):
 def test_session_state_transitions(client):
     client.post(
         "/api/v1/auth/register",
-        json={"email": "doc_state@example.com", "full_name": "State Doc", "password": "pwd"}
+        json={"email": "doc_state@example.com", "full_name": "State Doc", "password": "testpassword"}
     )
     login_resp = client.post(
         "/api/v1/auth/login",
-        data={"username": "doc_state@example.com", "password": "pwd"}
+        data={"username": "doc_state@example.com", "password": "testpassword"}
     )
     token = login_resp.json()["access_token"]
     
@@ -71,8 +71,8 @@ def test_session_state_transitions(client):
     db.close()
 
 def test_start_recording(client):
-    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "pwd"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "testpassword"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "testpassword"})
     token = login_resp.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
@@ -84,8 +84,8 @@ def test_start_recording(client):
     assert start_resp.json()["started_at"] is not None
 
 def test_start_recording_conflict(client):
-    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "pwd"})
-    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "testpassword"})
+    login_resp = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "testpassword"})
     token = login_resp.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token}"})
@@ -99,12 +99,12 @@ def test_start_recording_conflict(client):
     assert "Illegal state transition" in conflict_resp.json()["detail"]
 
 def test_start_recording_ownership(client):
-    client.post("/api/v1/auth/register", json={"email": "doc_other@example.com", "full_name": "Other Doc", "password": "pwd"})
-    login_other = client.post("/api/v1/auth/login", data={"username": "doc_other@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_other@example.com", "full_name": "Other Doc", "password": "testpassword"})
+    login_other = client.post("/api/v1/auth/login", data={"username": "doc_other@example.com", "password": "testpassword"})
     token_other = login_other.json()["access_token"]
     
-    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "pwd"})
-    login_start = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "pwd"})
+    client.post("/api/v1/auth/register", json={"email": "doc_start_rec@example.com", "full_name": "Start Doc", "password": "testpassword"})
+    login_start = client.post("/api/v1/auth/login", data={"username": "doc_start_rec@example.com", "password": "testpassword"})
     token_start = login_start.json()["access_token"]
     
     create_resp = client.post("/api/v1/sessions/", headers={"Authorization": f"Bearer {token_start}"})
