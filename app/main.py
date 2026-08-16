@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.core.logging import setup_logging
 
-from app.api.v1.endpoints import auth, sessions, transcripts, soap_notes, code_suggestions, signatures, emr_sync, retention
+from app.api.v1.endpoints import auth, sessions, transcripts, soap_notes, code_suggestions, signatures, emr_sync, retention, attention
 
 setup_logging()
 
@@ -89,6 +89,7 @@ TAGS_METADATA = [
     {"name": "code_suggestions", "description": "Ranked ICD-10 and CPT suggestions derived from the note's Assessment and Plan sections."},
     {"name": "signatures", "description": "Signing a note. This is the point at which a draft becomes an immutable clinical record."},
     {"name": "emr_sync", "description": "Status of the background push to the external EMR, triggered by signing."},
+    {"name": "attention", "description": "Consultations that did not complete — unsigned notes and failed EMR syncs. Empty under normal use."},
     {"name": "retention", "description": "Audio retention enforcement. Development and administrative use."},
 ]
 
@@ -144,4 +145,5 @@ app.include_router(soap_notes.note_router, prefix="/api/v1/soap-notes", tags=["s
 app.include_router(code_suggestions.router, prefix="/api/v1/soap-notes", tags=["code_suggestions"])
 app.include_router(signatures.router, prefix="/api/v1/soap-notes", tags=["signatures"])
 app.include_router(emr_sync.router, prefix="/api/v1/soap-notes", tags=["emr_sync"])
+app.include_router(attention.router, prefix="/api/v1", tags=["attention"])
 app.include_router(retention.router, prefix="/api/v1/admin", tags=["retention"])

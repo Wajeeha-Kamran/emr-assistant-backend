@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     # Retention: audio is held for RETENTION_WINDOW_MINUTES after being flagged,
     # then deleted on the next sweep. Worst-case latency = window + interval.
     # With defaults 4 min + 60 s = 5 min, satisfying the SRS's 5-minute NFR.
+    # Attention list: an unfinished consultation is only reported as stuck once
+    # it is older than this. The window exists so work in progress does not
+    # appear in its own author's attention list. Sized well above a normal
+    # consultation so it cannot fire mid-consultation.
+    ATTENTION_GRACE_MINUTES: int = 30
+
+    # Added to the ASR time budget before a transcript still in `processing` is
+    # treated as abandoned. Covers the commit that follows a timeout, so a job
+    # finishing right on its deadline is not reported as stalled.
+    ATTENTION_STALL_BUFFER_SECONDS: int = 120
+
     RETENTION_WINDOW_MINUTES: int = 4
     RETENTION_SWEEP_INTERVAL_SECONDS: int = 60
 

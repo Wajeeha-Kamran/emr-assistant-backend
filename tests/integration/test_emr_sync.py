@@ -179,3 +179,140 @@ def test_get_sync_status_api(client: TestClient, db: Session, doc: Doctor):
     
     assert res.status_code == 200
     assert res.json() == {"sync_status": "PENDING"}
+
+
+# ---------------------------------------------------------------------------
+# POST /{note_id}/retry-sync
+#
+# EMRSyncClient retries three times inside one job. Once those are exhausted
+# the note is left FAILED and nothing re-sends it, so without this endpoint the
+# consultation never reaches the EMR and its audio is never eligible for
+# deletion (the retention worker requires sync_status == SUCCESS).
+# ---------------------------------------------------------------------------
+
+RETRY_TARGET = "app.api.v1.endpoints.emr_sync.EMRSyncClient.sync_note_to_emr"
+
+
+def test_retry_sync_requeues_a_failed_note(client: TestClient, db: Session, doc: Doctor):
+    note = setup_mock_note(db, doc)
+    note.sync_status = SyncStatus.FAILED
+    db.commit()
+
+    token = create_access_token(subject=doc.email)
+
+    with patch(RETRY_TARGET) as mock_sync:
+        res = client.post(
+            f"/api/v1/soap-notes/{note.id}/retry-sync",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert res.status_code == 200
+    assert res.json() == {"sync_status": "PENDING"}
+
+    # TestClient runs background tasks before returning, so the job is queued
+    # against the same note id signing would have used.
+    mock_sync.assert_called_once_with(note.id)
+
+    db.refresh(note)
+    assert note.sync_status == SyncStatus.PENDING
+    # The signature is untouched. Retrying a delivery is not re-signing.
+    assert note.status == SOAPNoteStatus.SIGNED
+    assert note.signature is not None
+
+
+def test_retry_sync_rejects_a_successful_note(client: TestClient, db: Session, doc: Doctor):
+    note = setup_mock_note(db, doc)
+    note.sync_status = SyncStatus.SUCCESS
+    db.commit()
+
+    token = create_access_token(subject=doc.email)
+
+    with patch(RETRY_TARGET) as mock_sync:
+        res = client.post(
+            f"/api/v1/soap-notes/{note.id}/retry-sync",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert res.status_code == 409
+    mock_sync.assert_not_called()
+
+    db.refresh(note)
+    assert note.sync_status == SyncStatus.SUCCESS
+
+
+def test_retry_sync_rejects_a_pending_note(client: TestClient, db: Session, doc: Doctor):
+    """A job already in flight must not be duplicated; the EMR would store it twice."""
+    note = setup_mock_note(db, doc)
+    note.sync_status = SyncStatus.PENDING
+    db.commit()
+
+    token = create_access_token(subject=doc.email)
+
+    with patch(RETRY_TARGET) as mock_sync:
+        res = client.post(
+            f"/api/v1/soap-notes/{note.id}/retry-sync",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert res.status_code == 409
+    mock_sync.assert_not_called()
+
+
+def test_retry_sync_rejects_an_unsigned_note(client: TestClient, db: Session, doc: Doctor):
+    """sync_status is null until signing, so there is no delivery to retry."""
+    session = ConsultationSession(doctor_id=doc.id, status=SessionStatus.STOPPED)
+    db.add(session)
+    db.commit()
+    note = SOAPNote(session_id=session.id, status=SOAPNoteStatus.DRAFT)
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+
+    token = create_access_token(subject=doc.email)
+
+    with patch(RETRY_TARGET) as mock_sync:
+        res = client.post(
+            f"/api/v1/soap-notes/{note.id}/retry-sync",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert res.status_code == 409
+    mock_sync.assert_not_called()
+
+
+def test_retry_sync_denies_another_doctors_note(client: TestClient, db: Session, doc: Doctor):
+    note = setup_mock_note(db, doc)
+    note.sync_status = SyncStatus.FAILED
+    db.commit()
+
+    intruder = Doctor(
+        email=f"test_sync_intruder_{uuid.uuid4()}@example.com",
+        hashed_password="pw",
+        full_name="Dr. Intruder",
+    )
+    db.add(intruder)
+    db.commit()
+
+    token = create_access_token(subject=intruder.email)
+
+    with patch(RETRY_TARGET) as mock_sync:
+        res = client.post(
+            f"/api/v1/soap-notes/{note.id}/retry-sync",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    # 404, not 403: the API does not confirm that another doctor's note exists.
+    assert res.status_code == 404
+    mock_sync.assert_not_called()
+
+    db.refresh(note)
+    assert note.sync_status == SyncStatus.FAILED
+
+
+def test_retry_sync_requires_authentication(client: TestClient, db: Session, doc: Doctor):
+    note = setup_mock_note(db, doc)
+    note.sync_status = SyncStatus.FAILED
+    db.commit()
+
+    res = client.post(f"/api/v1/soap-notes/{note.id}/retry-sync")
+    assert res.status_code == 401

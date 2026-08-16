@@ -4,6 +4,7 @@ from app.db.session import get_db
 from app.api.deps import get_current_doctor
 from app.models.doctor import Doctor
 from app.models.session import ConsultationSession, SessionStatus
+from app.services.attention_service import AttentionService
 from app.models.transcript import Transcript, TranscriptStatus
 from app.schemas.transcript import TranscriptResponse
 from app.services.asr_service import ASRService
@@ -96,8 +97,21 @@ def retry_transcription(
             detail="Transcript record does not exist for this session"
         )
         
-    # Concurrency check
-    if transcript.status == TranscriptStatus.processing:
+    # Concurrency check.
+    #
+    # The guard exists to stop two passes writing segments for the same session
+    # at once. It must not outlive the job it is protecting: background tasks
+    # run inside the API process, so a restart mid-transcription leaves the row
+    # in `processing` forever with nothing running. Before 16 Aug 2026 that
+    # state was unrecoverable — this endpoint refused it, and it is the only
+    # way back.
+    #
+    # AttentionService.is_stalled reuses ASRService's own time budget to decide
+    # when the job can no longer be running, so a genuinely running pass is
+    # still refused.
+    if transcript.status == TranscriptStatus.processing and not AttentionService.is_stalled(
+        transcript, session.audio
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Transcription is already in progress"

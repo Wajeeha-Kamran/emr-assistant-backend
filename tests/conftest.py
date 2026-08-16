@@ -288,6 +288,12 @@ TRACEABILITY: Dict[str, Tuple[str, List[str]]] = {
     "tc10": ("Sync Failure Handling", [
         "integration/test_emr_sync.py::test_sync_forced_failure_tc10",
         "integration/test_emr_sync.py::test_sync_4xx_fail_fast",
+        "integration/test_emr_sync.py::test_retry_sync_requeues_a_failed_note",
+        "integration/test_emr_sync.py::test_retry_sync_rejects_a_successful_note",
+        "integration/test_emr_sync.py::test_retry_sync_rejects_a_pending_note",
+        "integration/test_emr_sync.py::test_retry_sync_rejects_an_unsigned_note",
+        "integration/test_emr_sync.py::test_retry_sync_denies_another_doctors_note",
+        "integration/test_emr_sync.py::test_retry_sync_requires_authentication",
         "integration/test_simulated_emr.py::test_receive_record_malformed",
     ]),
 }
@@ -304,6 +310,9 @@ SUPPORTING: Dict[str, Tuple[str, List[str]]] = {
     ]),
     "nfr_reliability": ("NFR — timeout behaviour", [
         "integration/test_timeouts.py",
+    ]),
+    "recovery": ("Recovery of incomplete consultations — added beyond the original STD", [
+        "integration/test_attention.py",
     ]),
     "infra": ("Infrastructure and configuration", [
         "unit/test_db.py",

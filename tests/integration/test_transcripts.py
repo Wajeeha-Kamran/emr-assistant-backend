@@ -152,3 +152,45 @@ def test_retry_success(client, mock_pipeline):
     retry_resp = client.post(f"/api/v1/sessions/{session_id}/transcript/retry", headers=headers)
     assert retry_resp.status_code == status.HTTP_200_OK
     assert retry_resp.json()["status"] == "processing"
+
+def test_retry_allowed_once_transcription_has_stalled(client, mock_pipeline):
+    """
+    A transcript abandoned in `processing` must be recoverable.
+
+    Background tasks run inside the API process, so a restart mid-transcription
+    leaves the row in `processing` with nothing running. The concurrency guard
+    used to refuse retry in that state, which made it permanent — and because
+    audio is deleted only after a successful sync, the recording stayed on disk
+    forever too. The guard now expires with the ASR time budget it protects.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    headers = get_auth_headers(client, "stalled@example.com")
+
+    resp = client.post("/api/v1/sessions/", headers=headers)
+    session_id = resp.json()["id"]
+    client.post(f"/api/v1/sessions/{session_id}/start-recording", headers=headers)
+
+    dummy_wav = io.BytesIO(b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80\x3e\x00\x00\x00\x7d\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00")
+    dummy_wav.name = "test.wav"
+    client.post(
+        f"/api/v1/sessions/{session_id}/stop-recording",
+        files={"file": ("test.wav", dummy_wav, "audio/wav")},
+        headers=headers
+    )
+
+    # Leave it processing, but dated far beyond any budget the ASR service
+    # would have given itself.
+    from app.db.session import SessionLocal
+    from app.models.transcript import Transcript
+    db = SessionLocal()
+    t = db.query(Transcript).filter(Transcript.session_id == session_id).first()
+    t.status = TranscriptStatus.processing
+    t.created_at = datetime.now(timezone.utc) - timedelta(days=1)
+    db.commit()
+    db.close()
+
+    retry_resp = client.post(f"/api/v1/sessions/{session_id}/transcript/retry", headers=headers)
+
+    assert retry_resp.status_code == status.HTTP_200_OK
+    assert retry_resp.json()["status"] == "processing"
