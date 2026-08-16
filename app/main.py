@@ -145,14 +145,3 @@ app.include_router(code_suggestions.router, prefix="/api/v1/soap-notes", tags=["
 app.include_router(signatures.router, prefix="/api/v1/soap-notes", tags=["signatures"])
 app.include_router(emr_sync.router, prefix="/api/v1/soap-notes", tags=["emr_sync"])
 app.include_router(retention.router, prefix="/api/v1/admin", tags=["retention"])
-
-@app.get("/health", tags=["health"], summary="Liveness check")
-def health_check():
-    """
-    Returns 200 while the application is running.
-
-    Checks nothing beyond the process itself — not the database, not the ML
-    models. A 200 here means the API is up, not that a consultation can be
-    processed. Suitable for a container liveness probe.
-    """
-    return {"status": "ok"}

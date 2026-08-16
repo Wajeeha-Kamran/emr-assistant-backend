@@ -1,6 +1,7 @@
 # EMR Assistant Backend Progress
 
-**State as of 16 August 2026.** Phases 0–9 complete. Phase 10 not started.
+**State as of 16 August 2026.** Phases 0–9 complete. Phase 10 in progress
+(10.4 done, 10.1 partial, 10.3 mostly done, 10.2 deferred).
 107 tests passing, all ten STD test cases green. Working tree clean.
 
 **Next up:** Phase 10 (Docker, CI, secrets, handoff package), then the .NET MAUI
@@ -159,11 +160,49 @@ in the Claude project, or the `docs/module_*.md` write-ups in this repo.
 
 ## PHASE 10 — Deployment Readiness
 - [ ] Module 10.1 — Containerization
+  - PARTIAL (16 Aug 2026). Docker is not installed on the development machine
+    and installing it would have cost the day, so run_backend.ps1 was written
+    instead: one command starts the API and the simulated EMR, waits for
+    /health to actually answer rather than assuming, and prints the addresses
+    for this machine, the Android emulator and a phone on the LAN.
+  - It binds 0.0.0.0 rather than 127.0.0.1. This is required for a phone or
+    emulator to reach the API at all; the default binding is unreachable from
+    anything but the host.
+  - Still outstanding for this module: a real Dockerfile and docker-compose
+    bringing up PostgreSQL alongside both services. The script covers the
+    development need; it does not make the system portable.
 - [ ] Module 10.2 — Basic CI Pipeline
+  - Not started. Deliberately deferred: it unblocks nothing and is easier to
+    write once a Dockerfile exists, since CI can reuse it.
 - [ ] Module 10.3 — Environment Configuration & Secrets
-- [ ] Module 10.4 — Final Backend Review & Frontend Handoff Package
+  - The urgent item is DONE: the Hugging Face token was rotated after being
+    visible in a screenshot.
+  - Verified 16 Aug 2026 that NO secret has ever been committed — .env is
+    absent from the whole git history, and the old hardcoded DB password does
+    not appear in any commit. The GitHub push is clean.
+  - DEFERRED WITH REASON, not forgotten: rotating ENCRYPTION_KEY invalidates
+    every Fernet-encrypted row in the development database. On a local machine
+    with synthetic data that is cost without benefit. Rotate it, the DB
+    password and the JWT secret at deployment, together, once.
+  - Still outstanding: restrict CORS from allow_origins=["*"] to the
+    frontend's real origin.
+- [x] Module 10.4 — Final Backend Review & Frontend Handoff Package
+  - docs/openapi.json exported by scripts/export_openapi.py. 19 paths,
+    19 operations, 23 schemas, zero undocumented operations.
+  - The export caught a real defect the test suite, the live Postman run and
+    code review had all missed: /health was defined twice in app/main.py,
+    producing a duplicate operation ID and an invalid contract. Behaviour was
+    correct because both definitions were identical, which is exactly why
+    nothing else found it. Removed.
+  - The backend review this module calls for was carried out across Modules
+    9.1–9.3 and the live API run, rather than as a separate exercise.
 
 ## Additional tasks (not in the original roadmap)
+- [x] Demonstration runbook (docs/demo_runbook.md) — a five-minute script for
+      showing the system to a supervisor, with the 90-second transcription
+      problem handled honestly (a 33s demo clip at docs/evidence/demo_clip.wav,
+      plus a prepared completed session as fallback) and prepared answers to
+      the questions most likely to be asked.
 - [x] CORS configuration — already present in app/main.py with
       allow_origins=["*"]. Confirmed 16 Aug 2026; this entry was stale.
       NOTE for Module 10.3: "*" is a development setting. Restrict to the
