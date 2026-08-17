@@ -159,7 +159,7 @@ def estimate_10min(asr_s: float, soap_s: float, clip_duration: float) -> float:
 
 
 async def main() -> None:
-    path = sys.argv[1] if len(sys.argv) > 1 else "test_audio_3289.wav"
+    path = sys.argv[1] if len(sys.argv) > 1 else "docs/evidence/load_clip.wav"
     duration = inspect_audio(path)
     with open(path, "rb") as f:
         audio = f.read()

@@ -39,10 +39,11 @@ Copy `.env.example` to `.env` and fill it in:
 
 | Variable | What it is |
 |---|---|
+| `APP_ENV` | `development` or `production`. Required — the app exits at startup if it is absent |
 | `DATABASE_URL` | PostgreSQL URL for `emr_assistant` |
 | `SIMULATED_EMR_DATABASE_URL` | PostgreSQL URL for `simulated_emr` |
 | `SIMULATED_EMR_URL` | Where the simulated EMR service listens (default `http://localhost:8001`) |
-| `SECRET_KEY` | JWT signing key |
+| `JWT_SECRET` | JWT signing key |
 | `ENCRYPTION_KEY` | Fernet key for encrypting clinical text at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `HF_TOKEN` | Hugging Face read token, required for speaker diarization (see below) |
 | `AUDIO_STORAGE_DIR` | Where uploaded recordings are written |

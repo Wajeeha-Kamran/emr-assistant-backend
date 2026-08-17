@@ -36,10 +36,10 @@ def main():
     # This is a real audio clip containing recorded speech ("You"). 
     # It will produce at least one transcribed segment.
     try:
-        with open("test_audio_3289.wav", "rb") as f:
+        with open("docs/evidence/pipeline_clip.wav", "rb") as f:
             real_audio_content = f.read()
     except FileNotFoundError:
-        print("ERROR: test_audio_3289.wav not found. Run a test to generate one first.")
+        print("ERROR: docs/evidence/pipeline_clip.wav not found.")
         return
     
     print("Starting REAL pipeline success rate measurement (Full Workflow)...")
@@ -61,7 +61,7 @@ def main():
             
             # 3. Stop Recording & Upload Audio
             from io import BytesIO
-            files = {"file": ("test_audio_3289.wav", BytesIO(real_audio_content), "audio/wav")}
+            files = {"file": ("pipeline_clip.wav", BytesIO(real_audio_content), "audio/wav")}
             resp = client.post(f"/api/v1/sessions/{session_id}/stop-recording", headers=headers, files=files)
             if resp.status_code not in [200, 202]:
                 continue

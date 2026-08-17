@@ -13,3 +13,8 @@ docs/evidence/diarized_output.txt
 # tried, but not part of the project's history — pytest already skips
 # them via norecursedirs.
 scratch/
+
+# Scratch recordings written into the repository root by earlier test runs.
+# Eleven were committed by accident. The one the success-rate script needs
+# lives in docs/evidence/pipeline_clip.wav instead, byte for byte identical.
+/test_audio_*.wav
