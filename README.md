@@ -205,8 +205,12 @@ tests/                unit and integration tests, mapped to TC-01…TC-10
 ## Before deployment
 
 - Restrict CORS. `allow_origins=["*"]` in `app/main.py` is a development setting.
-- Rotate every secret in `.env`. The Hugging Face token was exposed during
-  development and needs replacing.
+- Rotate the remaining secrets together: the database password, `JWT_SECRET`
+  and `ENCRYPTION_KEY`. Rotating `ENCRYPTION_KEY` invalidates every
+  Fernet-encrypted row, so it is done once at deployment alongside the others
+  rather than piecemeal. The Hugging Face token was already rotated after being
+  visible in a screenshot during development, and no secret has ever been
+  committed -- verified against the full git history on 16 August 2026.
 - Remove or protect `POST /api/v1/admin/retention/sweep`.
 - Provision a GPU if the SRS timing target must be met.
 
