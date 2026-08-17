@@ -122,3 +122,54 @@ def stop_recording(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=error_msg)
         
     return session
+
+
+@router.post("/{session_id}/discard", response_model=SessionResponse, status_code=status.HTTP_200_OK)
+def discard_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_doctor),
+):
+    """
+    Abandon a consultation that never produced a recording.
+
+    The client creates a session and calls start-recording the moment the doctor
+    presses Start, so the server knows a consultation is under way. If the
+    doctor then backs out, that session would otherwise sit in RECORDING
+    forever: it is not reported by the attention list, because with no audio and
+    no transcript there is nothing to resume and nothing on disk to clean up.
+    This endpoint closes it.
+
+    Allowed only from INITIATED or RECORDING. Once stop-recording has run, the
+    audio exists and the consultation holds clinical content; recovering it
+    through the attention list is then the only correct path, and 409 is
+    returned here. A doctor cannot discard a recorded consultation.
+
+    The row is kept rather than deleted, with discarded_at set. An abandoned
+    consultation holds no clinical content, but the fact that one was started
+    and abandoned is itself something an audit would want to see.
+    """
+    session = db.query(ConsultationSession).filter(
+        ConsultationSession.id == session_id,
+        ConsultationSession.doctor_id == current_doctor.id
+    ).first()
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found or does not belong to the current doctor"
+        )
+
+    try:
+        session = SessionManager.transition_state(db, session, SessionStatus.DISCARDED)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"A consultation in {session.status.value} cannot be discarded. "
+                "Once the recording has been uploaded the consultation holds "
+                "clinical content and must be completed rather than abandoned."
+            )
+        )
+
+    return session

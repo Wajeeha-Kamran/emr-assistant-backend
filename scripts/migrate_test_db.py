@@ -56,26 +56,34 @@ engine = create_engine(target)
 # Missing tables first — this is a no-op on an existing database.
 Base.metadata.create_all(bind=engine)
 
-# Then the objects create_all will not add to a table that already exists.
-# CREATE ... IF NOT EXISTS keeps this safe to re-run.
-STATEMENTS = [
-    (
-        "ix_doctors_email_lower",
-        "CREATE UNIQUE INDEX IF NOT EXISTS ix_doctors_email_lower ON doctors (lower(email))",
-    ),
+# Then the objects create_all will not add to a table that already exists:
+# columns and enum values on tables it has already seen. Every statement is
+# written to be safe to re-run.
+#
+# AUTOCOMMIT for the enum: ALTER TYPE ... ADD VALUE cannot run inside a
+# transaction block on older PostgreSQL.
+AUTOCOMMIT_STATEMENTS = [
+    ("sessionstatus.DISCARDED",
+     "ALTER TYPE sessionstatus ADD VALUE IF NOT EXISTS 'DISCARDED'"),
 ]
+
+STATEMENTS = [
+    ("ix_doctors_email_lower",
+     "CREATE UNIQUE INDEX IF NOT EXISTS ix_doctors_email_lower ON doctors (lower(email))"),
+    ("consultation_sessions.discarded_at",
+     "ALTER TABLE consultation_sessions ADD COLUMN IF NOT EXISTS discarded_at TIMESTAMPTZ"),
+]
+
+with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+    for label, sql in AUTOCOMMIT_STATEMENTS:
+        conn.execute(text(sql))
+        print(f"  {label}: ensured")
 
 with engine.connect() as conn:
     for label, sql in STATEMENTS:
-        existing = conn.execute(
-            text("SELECT 1 FROM pg_indexes WHERE indexname = :n"), {"n": label}
-        ).scalar()
-        if existing:
-            print(f"  {label}: already present")
-            continue
         conn.execute(text(sql))
         conn.commit()
-        print(f"  {label}: created")
+        print(f"  {label}: ensured")
 
 engine.dispose()
 print("Test database schema is up to date.")

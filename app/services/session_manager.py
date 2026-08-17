@@ -16,11 +16,16 @@ class SessionManager:
 
     @staticmethod
     def transition_state(db: Session, session: ConsultationSession, target_state: SessionStatus, commit: bool = True) -> ConsultationSession:
+        # DISCARDED is reachable only from the two states that hold no audio.
+        # STOPPED is deliberately excluded: by then the recording has been
+        # uploaded, so the consultation has clinical content and belongs to the
+        # attention list, not to a discard path.
         valid_transitions = {
-            SessionStatus.INITIATED: [SessionStatus.RECORDING],
-            SessionStatus.RECORDING: [SessionStatus.STOPPED],
+            SessionStatus.INITIATED: [SessionStatus.RECORDING, SessionStatus.DISCARDED],
+            SessionStatus.RECORDING: [SessionStatus.STOPPED, SessionStatus.DISCARDED],
             SessionStatus.STOPPED: [SessionStatus.FINALIZED],
-            SessionStatus.FINALIZED: []
+            SessionStatus.FINALIZED: [],
+            SessionStatus.DISCARDED: []
         }
         
         if target_state not in valid_transitions[session.status]:
@@ -35,6 +40,8 @@ class SessionManager:
             session.stopped_at = now
         elif target_state == SessionStatus.FINALIZED:
             session.finalized_at = now
+        elif target_state == SessionStatus.DISCARDED:
+            session.discarded_at = now
             
         if commit:
             db.commit()

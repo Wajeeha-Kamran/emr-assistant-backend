@@ -112,3 +112,110 @@ def test_start_recording_ownership(client):
     
     not_found_resp = client.post(f"/api/v1/sessions/{session_id}/start-recording", headers={"Authorization": f"Bearer {token_other}"})
     assert not_found_resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Discarding an abandoned consultation
+#
+# Added 17 Aug 2026. The client creates the session and calls start-recording
+# when the doctor presses Start, so the server observes UC-01 as it happens.
+# The cost is a state nothing previously closed: a consultation begun and then
+# abandoned before any audio was uploaded. It is not reported by the attention
+# list — with no audio and no transcript there is nothing to resume — so
+# without this endpoint it would sit in RECORDING forever.
+# ---------------------------------------------------------------------------
+
+def _discard_auth(client, email):
+    client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "full_name": "Discard Doc", "password": "testpassword"}
+    )
+    login = client.post(
+        "/api/v1/auth/login",
+        data={"username": email, "password": "testpassword"}
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+def test_discard_an_initiated_session(client):
+    headers = _discard_auth(client, "discard_init@example.com")
+    session_id = client.post("/api/v1/sessions/", headers=headers).json()["id"]
+
+    response = client.post(f"/api/v1/sessions/{session_id}/discard", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "DISCARDED"
+
+
+def test_discard_a_recording_session(client):
+    """The real case: the doctor pressed Start, then backed out."""
+    headers = _discard_auth(client, "discard_rec@example.com")
+    session_id = client.post("/api/v1/sessions/", headers=headers).json()["id"]
+    client.post(f"/api/v1/sessions/{session_id}/start-recording", headers=headers)
+
+    response = client.post(f"/api/v1/sessions/{session_id}/discard", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "DISCARDED"
+
+    from app.models.session import ConsultationSession
+    db = SessionLocal()
+    try:
+        stored = db.query(ConsultationSession).filter(
+            ConsultationSession.id == session_id
+        ).first()
+        # Kept, not deleted, and stamped.
+        assert stored is not None
+        assert stored.status == SessionStatus.DISCARDED
+        assert stored.discarded_at is not None
+    finally:
+        db.close()
+
+
+def test_discard_refused_once_audio_exists(client):
+    """
+    A recorded consultation holds clinical content and must be completed or
+    recovered, never abandoned. Reaching STOPPED requires an upload, so the
+    state is set directly here rather than uploading a file.
+    """
+    headers = _discard_auth(client, "discard_stopped@example.com")
+    session_id = client.post("/api/v1/sessions/", headers=headers).json()["id"]
+    client.post(f"/api/v1/sessions/{session_id}/start-recording", headers=headers)
+
+    from app.models.session import ConsultationSession
+    db = SessionLocal()
+    try:
+        stored = db.query(ConsultationSession).filter(
+            ConsultationSession.id == session_id
+        ).first()
+        stored.status = SessionStatus.STOPPED
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.post(f"/api/v1/sessions/{session_id}/discard", headers=headers)
+
+    assert response.status_code == 409
+    assert "clinical content" in response.json()["detail"]
+
+
+def test_discard_is_not_repeatable(client):
+    headers = _discard_auth(client, "discard_twice@example.com")
+    session_id = client.post("/api/v1/sessions/", headers=headers).json()["id"]
+
+    assert client.post(f"/api/v1/sessions/{session_id}/discard", headers=headers).status_code == 200
+    assert client.post(f"/api/v1/sessions/{session_id}/discard", headers=headers).status_code == 409
+
+
+def test_discard_denies_another_doctors_session(client):
+    owner = _discard_auth(client, "discard_owner@example.com")
+    intruder = _discard_auth(client, "discard_intruder@example.com")
+
+    session_id = client.post("/api/v1/sessions/", headers=owner).json()["id"]
+
+    response = client.post(f"/api/v1/sessions/{session_id}/discard", headers=intruder)
+    assert response.status_code == 404
+
+
+def test_discard_requires_authentication(client):
+    assert client.post("/api/v1/sessions/1/discard").status_code == 401

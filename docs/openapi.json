@@ -290,6 +290,54 @@
         }
       }
     },
+    "/api/v1/sessions/{session_id}/discard": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Discard Session",
+        "description": "Abandon a consultation that never produced a recording.\n\nThe client creates a session and calls start-recording the moment the doctor\npresses Start, so the server knows a consultation is under way. If the\ndoctor then backs out, that session would otherwise sit in RECORDING\nforever: it is not reported by the attention list, because with no audio and\nno transcript there is nothing to resume and nothing on disk to clean up.\nThis endpoint closes it.\n\nAllowed only from INITIATED or RECORDING. Once stop-recording has run, the\naudio exists and the consultation holds clinical content; recovering it\nthrough the attention list is then the only correct path, and 409 is\nreturned here. A doctor cannot discard a recorded consultation.\n\nThe row is kept rather than deleted, with discarded_at set. An abandoned\nconsultation holds no clinical content, but the fact that one was started\nand abandoned is itself something an audit would want to see.",
+        "operationId": "discard_session_api_v1_sessions__session_id__discard_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/sessions/{session_id}/transcript": {
       "get": {
         "tags": [
@@ -1395,7 +1443,8 @@
           "INITIATED",
           "RECORDING",
           "STOPPED",
-          "FINALIZED"
+          "FINALIZED",
+          "DISCARDED"
         ],
         "title": "SessionStatus"
       },

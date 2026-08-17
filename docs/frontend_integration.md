@@ -318,3 +318,67 @@ sign screen already does.
 Note that `EMRSyncClient` already makes three attempts with backoff **inside a
 single job**. This endpoint is for the case where all three were exhausted and
 the job ended.
+
+
+---
+
+## 8. Starting and abandoning a consultation
+
+Added 17 Aug 2026.
+
+### When to create the session
+
+**When the doctor presses Start, not when the recording screen opens and not when
+it finishes.**
+
+```
+Press Start  ->  POST /api/v1/sessions/
+             ->  POST /api/v1/sessions/{id}/start-recording
+```
+
+Creating it only at the end would work mechanically — the state machine would
+still see INITIATED, RECORDING and STOPPED in order — but the server would never
+observe UC-01 happening. It would only be told about it afterwards. UC-01 is a
+use case with its own test case, so it should be exercised for real.
+
+### `POST /api/v1/sessions/{session_id}/discard`
+
+The cost of creating the session at Start is a state nothing else closes: a
+consultation begun and then abandoned before any audio was uploaded. It is not
+reported by `GET /api/v1/attention`, and correctly so — with no audio and no
+transcript there is nothing to resume and nothing on disk to clean up — so
+without this endpoint it would sit in RECORDING permanently.
+
+| Status | Meaning |
+|---|---|
+| 200 | Discarded. The session moves to DISCARDED and `discarded_at` is stamped. |
+| 409 | The session is STOPPED, FINALIZED or already DISCARDED. |
+| 404 | No such session, or it belongs to another doctor. |
+
+**The 409 on STOPPED is the important guard.** By then the recording has been
+uploaded, so the consultation holds clinical content. It must be completed, or
+recovered through the attention list. A doctor cannot discard a recorded
+consultation.
+
+The row is kept rather than deleted. It holds no clinical content, but the fact
+that a consultation was started and abandoned is itself something an audit would
+want to see.
+
+### What the record screen does with it
+
+| Back arrow while | Behaviour |
+|---|---|
+| Ready — nothing recorded yet | Return to the dashboard. No session exists |
+| Recording or paused | Confirm, then `POST .../discard`, then return |
+| Uploading | Blocked. The upload cannot survive leaving the screen |
+| Upload failed | Confirm, then discard the local file only. The session is already STOPPED, so it stays and appears in the attention list |
+
+That last row matters: once the upload has started the consultation is real. If
+it fails it belongs to the recovery path, not the discard path.
+
+### The 30-minute limit
+
+`audio_manager.py` rejects any recording longer than 1800 seconds with a 400,
+and that check runs **after** the upload completes. The client must show the
+limit on the timer and stop recording at 30:00 by itself. Without that, a doctor
+can record 35 minutes, wait through the upload, and lose all of it.
