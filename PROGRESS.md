@@ -1,6 +1,6 @@
 # Backend progress log
 
-**State as of 17 August 2026.** Phases 0 to 9 are complete. Phase 10 is partly
+**State as of 18 August 2026.** Phases 0 to 9 are complete. Phase 10 is partly
 done: 10.4 finished, 10.1 partial, 10.3 mostly done, 10.2 deferred on purpose.
 All ten STD test cases are green and the working tree is clean at `60e2879`.
 
@@ -10,8 +10,13 @@ the more useful half. If you are picking this project up, read this alongside
 `README.md` (setup and how the system works) and the `docs/module_*.md` write-ups
 (the measurements behind every number quoted here).
 
-**Still to do:** finish Phase 10 (Dockerfile, CI, restrict CORS), and the two
-remaining screens in the mobile client.
+**The mobile client is complete** as of 18 August: all nine screens, live
+microphone capture, and the whole workflow — record, transcribe, draft, edit,
+code, sign, sync — walked end to end against this backend. See
+`claude/EMR-Assistant-Frontend-Handover.pdf`.
+
+**Still to do:** finish Phase 10 (Dockerfile, CI, restrict CORS), and move the
+two synchronous endpoints to background tasks (see Open work).
 
 
 ## PHASE 0 — Environment and core bootstrap
@@ -264,6 +269,30 @@ and finding something the backend could not support.
 - [ ] Set `HF_HUB_OFFLINE=1` and `TRANSFORMERS_OFFLINE=1` once the models are
       cached, so that the absence of any external processing can be demonstrated
       by disconnecting the machine rather than only described.
+- [ ] Move `POST /sessions/{id}/soap-notes/generate` and the code-suggestion
+      generate endpoint to background tasks. Both run their models inline and
+      block the request for 15 to 25 seconds. Transcription already works the
+      right way — `stop-recording` returns immediately and the client polls
+      `GET .../transcript` — so this is applying an existing pattern to the two
+      endpoints that missed it, not new design. Raised by the supervisor on
+      17 Aug, and the mobile client already polls, so it needs no change.
+- [ ] Compare alternative models for the stage that measured weakest. Whisper
+      Medium or NVIDIA Parakeet for transcription, and NVIDIA Sortformer against
+      the current pyannote pipeline for speaker separation, measured in Colab
+      with `scripts/evaluate_accuracy.py` rather than a fresh script, so the
+      numbers stay comparable to those already reported. Fix the comparison
+      protocol before running it.
+- [ ] Test the pipeline against noisy audio and decide whether preprocessing
+      helps. There is currently no preprocessing at all — audio goes to Whisper
+      exactly as recorded. Expectation, to be measured rather than assumed:
+      noise will hurt speaker separation more than transcription, since Whisper
+      was trained on noisy audio, and aggressive denoising may hurt
+      transcription by removing speech detail.
+- [ ] Evaluate a generative model (for example Qwen3-4B) against the current
+      extractive pipeline, scoring **faithfulness** and not only structure:
+      what proportion of the clinical statements in the generated note can be
+      traced to the transcript. The extractive design cannot invent content;
+      any replacement has to be measured on that, not on how well it reads.
 - [ ] Optional: one GPU measurement, for example on Google Colab, to evidence that
       the efficiency target is hardware-bound rather than design-bound.
 
