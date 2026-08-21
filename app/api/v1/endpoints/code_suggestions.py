@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 import logging
 
@@ -9,6 +9,8 @@ from app.models.soap_note import SOAPNote, SOAPNoteStatus
 from app.models.session import ConsultationSession
 from app.models.code_suggestion import CodeSuggestion
 from app.schemas.code_suggestion import CodeSuggestionResponse, CodeSuggestionUpdateRequest
+from app.models.soap_note import GenerationStatus
+from app.services.attention_service import AttentionService
 from app.services.code_suggester import CodeSuggesterService, SOAPNoteAlreadySignedError
 
 logger = logging.getLogger(__name__)
@@ -32,14 +34,15 @@ def get_soap_note_or_404(db: Session, note_id: int, current_doctor: Doctor) -> S
         )
     return note
 
-@router.post("/{note_id}/code-suggestions/generate", response_model=List[CodeSuggestionResponse])
+@router.post("/{note_id}/code-suggestions/generate", response_model=List[CodeSuggestionResponse], status_code=status.HTTP_202_ACCEPTED)
 def generate_code_suggestions(
     note_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_doctor: Doctor = Depends(get_current_doctor)
 ):
     """
-    Generate ranked ICD-10 and CPT suggestions for a note.
+    Start generating ranked ICD-10 and CPT suggestions for a note.
 
     Diagnosis codes are drawn from the Assessment section and procedure codes
     from the Plan section, matched against the reference code set by clinical
@@ -49,25 +52,58 @@ def generate_code_suggestions(
 
     Suggestions are proposals for the clinician to accept, not billing
     decisions.
+    
+    Returns 202 Accepted. Poll GET to check status.
     """
     note = get_soap_note_or_404(db, note_id, current_doctor)
     
     try:
-        suggestions = CodeSuggesterService.generate_suggestions(note.id, db)
-        return suggestions
+        CodeSuggesterService.prepare_generation(note.id, db)
+        background_tasks.add_task(CodeSuggesterService.generate_in_background, note.id)
+        return []
     except SOAPNoteAlreadySignedError as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Error generating code suggestions for note {note_id}: {e}", exc_info=True)
-        # Returning a 500 error here. This does not affect the SOAP note itself,
-        # which means the graceful degradation requirement is met. The client will handle this error
-        # while still being able to fetch the SOAP note from the GET /soap-notes/{id} endpoint.
+        logger.error(f"Error preparing code suggestions for note {note_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to generate code suggestions."
+        )
+
+@router.post("/{note_id}/code-suggestions/retry", response_model=List[CodeSuggestionResponse], status_code=status.HTTP_202_ACCEPTED)
+def retry_code_suggestions(
+    note_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_doctor: Doctor = Depends(get_current_doctor)
+):
+    """
+    Re-run code suggestion generation for a session whose generation failed or stalled.
+    
+    Returns 409 if generation is already running. Note that this endpoint can also
+    be used if generation is stuck in `processing`.
+    """
+    note = get_soap_note_or_404(db, note_id, current_doctor)
+
+    # If it's already processing, ensure it's actually stalled before allowing retry.
+    if note.codes_generation_status == GenerationStatus.processing:
+        if not AttentionService.is_codes_stalled(note):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Code suggestion generation is already in progress"
+            )
+
+    try:
+        CodeSuggesterService.prepare_generation(note.id, db)
+        background_tasks.add_task(CodeSuggesterService.generate_in_background, note.id)
+        return []
+    except SOAPNoteAlreadySignedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
         )
 
 @router.get("/{note_id}/code-suggestions", response_model=List[CodeSuggestionResponse])

@@ -87,48 +87,24 @@ def api_test_data(db: Session, client: TestClient):
     }
 
 def test_generate_draft_success(client: TestClient, api_test_data: dict, db: Session, monkeypatch):
-    """POST /generate success returns 201 Created and exactly 4 sections."""
+    """POST /generate success returns 202 Accepted and status processing."""
     headers = api_test_data["headers"]
     session_id = api_test_data["session_ready_id"]
     
-    # Mock SOAPService.generate_draft to avoid slow ML execution
-    def mock_generate(*args, **kwargs):
-        return {
-            "subjective": "Subj",
-            "objective": "Obj",
-            "assessment": "Ass",
-            "plan": "Plan"
-        }
-    monkeypatch.setattr("app.services.soap_service.SOAPService.generate_draft", mock_generate)
+    # Mock the background task so it doesn't actually run during the API test
+    monkeypatch.setattr("app.services.soap_note_service.SOAPNoteService.generate_in_background", lambda s, n: None)
     
     response = client.post(f"/api/v1/sessions/{session_id}/soap-notes/generate", headers=headers)
-    assert response.status_code == 201
+    assert response.status_code == 202
     
     data = response.json()
     assert data["session_id"] == session_id
     assert data["status"] == "DRAFT"
+    assert data["generation_status"] == "processing"
     assert "sections" in data
-    assert len(data["sections"]) == 4
-    
-    section_types = {s["section_type"] for s in data["sections"]}
-    assert section_types == {"SUBJECTIVE", "OBJECTIVE", "ASSESSMENT", "PLAN"}
+    assert len(data["sections"]) == 0
 
-def test_generate_draft_validation_error(client: TestClient, api_test_data: dict, db: Session, monkeypatch):
-    """POST /generate failing 4-section guarantee returns 500."""
-    headers = api_test_data["headers"]
-    session_id = api_test_data["session_ready_id"]
-    
-    def mock_generate_bad(*args, **kwargs):
-        return {
-            "subjective": "Subj",
-            "objective": "Obj"
-            # Missing assessment and plan
-        }
-    monkeypatch.setattr("app.services.soap_service.SOAPService.generate_draft", mock_generate_bad)
-    
-    response = client.post(f"/api/v1/sessions/{session_id}/soap-notes/generate", headers=headers)
-    assert response.status_code == 500
-    assert "missing required sections" in response.json()["detail"].lower()
+
 
 def test_generate_draft_already_signed(client: TestClient, api_test_data: dict):
     """POST /generate on a SIGNED note returns 409 Conflict."""
@@ -167,11 +143,19 @@ def test_get_soap_note_success(client: TestClient, api_test_data: dict, monkeypa
     headers = api_test_data["headers"]
     session_id = api_test_data["session_ready_id"]
     
-    # Generate draft first
-    def mock_generate(*args, **kwargs):
-        return {"subjective": "S", "objective": "O", "assessment": "A", "plan": "P"}
-    monkeypatch.setattr("app.services.soap_service.SOAPService.generate_draft", mock_generate)
-    client.post(f"/api/v1/sessions/{session_id}/soap-notes/generate", headers=headers)
+    # Setup a draft note
+    from app.models.soap_note import GenerationStatus
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    note = SOAPNote(session_id=session_id, status=SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.completed)
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    
+    sec = SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.SUBJECTIVE, content="S")
+    db.add(sec)
+    db.commit()
+    db.close()
     
     # Now retrieve it
     response = client.get(f"/api/v1/sessions/{session_id}/soap-notes", headers=headers)
@@ -179,7 +163,26 @@ def test_get_soap_note_success(client: TestClient, api_test_data: dict, monkeypa
     
     data = response.json()
     assert data["session_id"] == session_id
-    assert len(data["sections"]) == 4
+    assert len(data["sections"]) == 1
+
+def test_retry_generation(client: TestClient, api_test_data: dict, monkeypatch):
+    """POST /retry returns 202 and resets status to processing."""
+    headers = api_test_data["headers"]
+    session_id = api_test_data["session_ready_id"]
+    
+    from app.models.soap_note import GenerationStatus
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    note = SOAPNote(session_id=session_id, status=SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.failed)
+    db.add(note)
+    db.commit()
+    db.close()
+    
+    monkeypatch.setattr("app.services.soap_note_service.SOAPNoteService.generate_in_background", lambda s, n: None)
+    
+    response = client.post(f"/api/v1/sessions/{session_id}/soap-notes/retry", headers=headers)
+    assert response.status_code == 202
+    assert response.json()["generation_status"] == "processing"
 
 def test_get_soap_note_not_found(client: TestClient, api_test_data: dict):
     """GET /soap-notes for session without draft returns 404."""

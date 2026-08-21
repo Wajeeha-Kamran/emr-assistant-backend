@@ -20,13 +20,17 @@ from app.core.config import settings
 from app.models.audio import AudioMetadata
 from app.models.doctor import Doctor
 from app.models.session import ConsultationSession
-from app.models.soap_note import SOAPNote, SOAPNoteStatus, SyncStatus
+from app.models.soap_note import SOAPNote, SOAPNoteStatus, SyncStatus, GenerationStatus
 from app.models.transcript import Transcript, TranscriptStatus
 from app.schemas.attention import AttentionAction, AttentionItem, AttentionReason
 
 ACTION_FOR_REASON = {
     AttentionReason.TRANSCRIPT_FAILED: AttentionAction.RESUME_TRANSCRIPTION,
     AttentionReason.TRANSCRIPT_STALLED: AttentionAction.RESUME_TRANSCRIPTION,
+    AttentionReason.SOAP_GENERATION_FAILED: AttentionAction.RETRY_SOAP_GENERATION,
+    AttentionReason.SOAP_GENERATION_STALLED: AttentionAction.RETRY_SOAP_GENERATION,
+    AttentionReason.CODES_GENERATION_FAILED: AttentionAction.RETRY_CODES_GENERATION,
+    AttentionReason.CODES_GENERATION_STALLED: AttentionAction.RETRY_CODES_GENERATION,
     AttentionReason.NOTE_NOT_GENERATED: AttentionAction.GENERATE_NOTE,
     AttentionReason.NOT_SIGNED: AttentionAction.SIGN_NOTE,
     AttentionReason.SYNC_FAILED: AttentionAction.RETRY_SYNC,
@@ -82,6 +86,40 @@ class AttentionService:
         return now > AttentionService.asr_deadline(transcript, audio)
 
     @staticmethod
+    def _job_started_at(note: SOAPNote, field: str) -> Optional[datetime]:
+        """When a generation job began.
+
+        Deliberately not note.created_at. A note is created once, but generation
+        can be re-run and code suggestion is triggered later still, after the
+        doctor has read the draft — so created_at is older than the job by an
+        unbounded amount, and measuring a deadline from it reports a job that
+        started seconds ago as abandoned.
+
+        Falls back to created_at for rows written before the started_at columns
+        existed, which is the behaviour those rows were created under.
+        """
+        return _aware(getattr(note, field, None)) or _aware(note.created_at)
+
+    @staticmethod
+    def is_soap_stalled(note: Optional[SOAPNote], now: Optional[datetime] = None) -> bool:
+        if note is None or getattr(note, 'generation_status', None) != GenerationStatus.processing:
+            return False
+        now = now or datetime.now(timezone.utc)
+        # SOAP generation is usually 15-25 seconds, we give it a 60 second budget + buffer
+        budget = 60 + settings.ATTENTION_STALL_BUFFER_SECONDS
+        started = AttentionService._job_started_at(note, 'generation_started_at')
+        return now > (started + timedelta(seconds=budget))
+
+    @staticmethod
+    def is_codes_stalled(note: Optional[SOAPNote], now: Optional[datetime] = None) -> bool:
+        if note is None or getattr(note, 'codes_generation_status', None) != GenerationStatus.processing:
+            return False
+        now = now or datetime.now(timezone.utc)
+        budget = settings.NLP_TIMEOUT_SECONDS + settings.ATTENTION_STALL_BUFFER_SECONDS
+        started = AttentionService._job_started_at(note, 'codes_generation_started_at')
+        return now > (started + timedelta(seconds=budget))
+
+    @staticmethod
     def collect(db: Session, doctor: Doctor) -> List[AttentionItem]:
         """Return this doctor's stuck consultations, newest consultation first.
 
@@ -120,12 +158,21 @@ class AttentionService:
             if note is not None:
                 if note.sync_status == SyncStatus.FAILED:
                     emit(session, AttentionReason.SYNC_FAILED, note)
+                elif note.generation_status == GenerationStatus.failed:
+                    emit(session, AttentionReason.SOAP_GENERATION_FAILED, note)
+                elif AttentionService.is_soap_stalled(note, now):
+                    emit(session, AttentionReason.SOAP_GENERATION_STALLED, note)
+                elif note.codes_generation_status == GenerationStatus.failed:
+                    emit(session, AttentionReason.CODES_GENERATION_FAILED, note)
+                elif AttentionService.is_codes_stalled(note, now):
+                    emit(session, AttentionReason.CODES_GENERATION_STALLED, note)
                 elif (
                     note.status == SOAPNoteStatus.DRAFT
                     and _aware(note.created_at) <= grace_cutoff
+                    and note.generation_status == GenerationStatus.completed
                 ):
                     # Inside the grace window this is the note being written
-                    # right now, not an abandoned one.
+                    # right now, not an abandoned one. Only flag if generation finished.
                     emit(session, AttentionReason.NOT_SIGNED, note)
                 continue
 

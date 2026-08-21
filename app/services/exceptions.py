@@ -17,3 +17,12 @@ class TranscriptNotReadyError(Exception):
 class SOAPSectionNotFoundError(Exception):
     """Raised when a specific SOAP section cannot be found for a note."""
     pass
+
+class CodeSuggestionTimeoutError(Exception):
+    """Raised when code suggestion inference exceeds NLP_TIMEOUT_SECONDS.
+
+    A domain exception rather than an HTTPException because this is raised
+    inside a background task, where there is no response to attach a status
+    code to. The message is stored in SOAPNote.codes_generation_error.
+    """
+    pass

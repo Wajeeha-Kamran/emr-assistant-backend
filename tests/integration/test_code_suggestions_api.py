@@ -62,14 +62,15 @@ def test_generate_code_suggestions_success(client: TestClient, db: Session, api_
     db.commit()
 
     headers = {"Authorization": f"Bearer {token}"}
-    response = client.post(f"/api/v1/soap-notes/{note.id}/code-suggestions/generate", headers=headers)
     
-    assert response.status_code == status.HTTP_200_OK
+    with patch("app.api.v1.endpoints.code_suggestions.CodeSuggesterService.generate_in_background") as mock_bg:
+        response = client.post(f"/api/v1/soap-notes/{note.id}/code-suggestions/generate", headers=headers)
+    
+    assert response.status_code == status.HTTP_202_ACCEPTED
     data = response.json()
     assert isinstance(data, list)
-    assert len(data) == 10
-    assert data[0]["code_type"] == CodeType.ICD10.value
-    assert data[0]["rank"] == 1
+    assert len(data) == 0
+    mock_bg.assert_called_once_with(note.id)
 
 def test_get_code_suggestions_success(client: TestClient, db: Session, api_setup: dict):
     doc = api_setup["doc"]
@@ -158,14 +159,15 @@ def test_generate_code_suggestions_empty_note(client: TestClient, db: Session, a
     db.commit()
 
     headers = {"Authorization": f"Bearer {token}"}
-    response = client.post(f"/api/v1/soap-notes/{note.id}/code-suggestions/generate", headers=headers)
+    with patch("app.api.v1.endpoints.code_suggestions.CodeSuggesterService.generate_in_background") as mock_bg:
+        response = client.post(f"/api/v1/soap-notes/{note.id}/code-suggestions/generate", headers=headers)
     
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_202_ACCEPTED
     data = response.json()
     assert isinstance(data, list)
     assert len(data) == 0
 
-def test_generate_code_suggestions_graceful_degradation(client: TestClient, db: Session, api_setup: dict):
+def test_retry_code_suggestions(client: TestClient, db: Session, api_setup: dict):
     doc = api_setup["doc"]
     token = api_setup["token"]
     
@@ -173,29 +175,20 @@ def test_generate_code_suggestions_graceful_degradation(client: TestClient, db: 
     db.add(session)
     db.commit()
     
-    note = SOAPNote(session_id=session.id, status=SOAPNoteStatus.DRAFT)
+    from app.models.soap_note import GenerationStatus
+    note = SOAPNote(session_id=session.id, status=SOAPNoteStatus.DRAFT, codes_generation_status=GenerationStatus.failed)
     db.add(note)
     db.commit()
     
-    db.add_all([
-        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.SUBJECTIVE, content="Data"),
-        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.OBJECTIVE, content="Data"),
-        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.ASSESSMENT, content="Data"),
-        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.PLAN, content="Data")
-    ])
-    db.commit()
-
     headers = {"Authorization": f"Bearer {token}"}
-    
-    with patch("app.api.v1.endpoints.code_suggestions.CodeSuggesterService.generate_suggestions") as mock_generate:
-        mock_generate.side_effect = Exception("Model failed to load or similar unexpected issue")
+    with patch("app.api.v1.endpoints.code_suggestions.CodeSuggesterService.generate_in_background") as mock_bg:
+        response = client.post(f"/api/v1/soap-notes/{note.id}/code-suggestions/retry", headers=headers)
         
-        response = client.post(f"/api/v1/soap-notes/{note.id}/code-suggestions/generate", headers=headers)
-        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-        
-    response_note = client.get(f"/api/v1/sessions/{session.id}/soap-notes", headers=headers)
-    assert response_note.status_code == status.HTTP_200_OK
-    assert response_note.json()["id"] == note.id
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    assert len(response.json()) == 0
+    mock_bg.assert_called_once_with(note.id)
+
+
 
 def test_unauthenticated_access(client: TestClient, db: Session):
     response = client.post("/api/v1/soap-notes/1/code-suggestions/generate")

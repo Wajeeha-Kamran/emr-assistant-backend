@@ -37,7 +37,11 @@ def test_generate_suggestions_success(test_data):
     db_session.commit()
     
     # Generate
-    suggestions = CodeSuggesterService.generate_suggestions(note.id, db_session)
+    CodeSuggesterService.prepare_generation(note.id, db_session)
+    CodeSuggesterService.generate_in_background(note.id)
+    
+    db_session.refresh(note)
+    suggestions = db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).order_by(CodeSuggestion.rank).all()
     
     # Verify 10 generated (5 ICD10, 5 CPT)
     assert len(suggestions) == 10
@@ -76,7 +80,10 @@ def test_generate_suggestions_empty_note(test_data):
     ])
     db_session.commit()
     
-    suggestions = CodeSuggesterService.generate_suggestions(note.id, db_session)
+    CodeSuggesterService.prepare_generation(note.id, db_session)
+    CodeSuggesterService.generate_in_background(note.id)
+    
+    suggestions = db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).all()
     assert len(suggestions) == 0
     assert db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).count() == 0
 
@@ -97,11 +104,13 @@ def test_regenerate_draft_deletes_old_suggestions(test_data):
     db_session.commit()
     
     # Generate first time
-    CodeSuggesterService.generate_suggestions(note.id, db_session)
+    CodeSuggesterService.prepare_generation(note.id, db_session)
+    CodeSuggesterService.generate_in_background(note.id)
     assert db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).count() == 10
     
     # Generate second time
-    CodeSuggesterService.generate_suggestions(note.id, db_session)
+    CodeSuggesterService.prepare_generation(note.id, db_session)
+    CodeSuggesterService.generate_in_background(note.id)
     
     # Should still be 10, not 20
     assert db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).count() == 10
@@ -124,7 +133,9 @@ def test_regenerate_signed_raises_error_and_keeps_old(test_data):
     db_session.commit()
     
     # Generate
-    initial_suggestions = CodeSuggesterService.generate_suggestions(note.id, db_session)
+    CodeSuggesterService.prepare_generation(note.id, db_session)
+    CodeSuggesterService.generate_in_background(note.id)
+    initial_suggestions = db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).all()
     assert len(initial_suggestions) == 10
     
     # Mark as signed
@@ -133,7 +144,7 @@ def test_regenerate_signed_raises_error_and_keeps_old(test_data):
     
     # Try to regenerate
     with pytest.raises(SOAPNoteAlreadySignedError):
-        CodeSuggesterService.generate_suggestions(note.id, db_session)
+        CodeSuggesterService.prepare_generation(note.id, db_session)
         
     # Verify original 5 are intact
     assert db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).count() == 10
@@ -155,7 +166,9 @@ def test_generate_suggestions_single_section_only(test_data):
     ])
     db_session.commit()
     
-    suggestions = CodeSuggesterService.generate_suggestions(note.id, db_session)
+    CodeSuggesterService.prepare_generation(note.id, db_session)
+    CodeSuggesterService.generate_in_background(note.id)
+    suggestions = db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).order_by(CodeSuggestion.rank).all()
     
     # Should only generate 5 ICD10 codes
     assert len(suggestions) == 5
@@ -194,7 +207,9 @@ def test_rank_ordering_sequential_no_gaps(test_data):
         return []
 
     with patch('app.services.code_reference_service.CodeReferenceService.search_codes', side_effect=side_effect):
-        suggestions = CodeSuggesterService.generate_suggestions(note.id, db_session)
+        CodeSuggesterService.prepare_generation(note.id, db_session)
+        CodeSuggesterService.generate_in_background(note.id)
+        suggestions = db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).order_by(CodeSuggestion.rank).all()
         
         assert len(suggestions) == 8
         ranks = [s.rank for s in suggestions]

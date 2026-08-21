@@ -135,6 +135,21 @@ def _test_database():
 
     Base.metadata.create_all(bind=engine)
 
+    # create_all only creates tables that are missing entirely. A column added
+    # to a table that already exists is never applied, so the test database
+    # falls behind the models and every test touching that table dies with
+    # UndefinedColumn — which reads as broken code rather than a stale schema.
+    # That has now cost a full run twice. Repairing it here means an ordinary
+    # `pytest` is enough; scripts/migrate_test_db.py does the same from the
+    # command line when you want to see what changed without running the suite.
+    from scripts.migrate_test_db import sync_schema
+
+    added = sync_schema(engine, Base.metadata)
+    if added:
+        print("\nTest database was behind the models. Added:")
+        for label in added:
+            print(f"  {label}")
+
     # Reference codes are seeded automatically. TC-08's tests assert against
     # specific ICD-10/CPT codes, so an empty code_reference table would fail
     # them for a reason that has nothing to do with the code under test.
@@ -261,17 +276,19 @@ TRACEABILITY: Dict[str, Tuple[str, List[str]]] = {
     ]),
     "tc07": ("SOAP Draft Generated", [
         "integration/test_soap_draft.py",
-        "integration/test_soap_notes.py::test_generate_and_save_draft_success",
+        "integration/test_soap_notes.py::test_generate_and_save_draft_setup",
+        "integration/test_soap_notes.py::test_generate_in_background_success",
         "integration/test_soap_notes.py::test_ownership_check",
         "integration/test_soap_notes.py::test_enforce_four_sections",
+        "integration/test_soap_notes.py::test_prevent_signed_note_overwrite",
         "integration/test_soap_notes_api.py::test_generate_draft_success",
-        "integration/test_soap_notes_api.py::test_generate_draft_validation_error",
         "integration/test_soap_notes_api.py::test_generate_draft_already_signed",
         "integration/test_soap_notes_api.py::test_generate_draft_transcript_not_ready",
         "integration/test_soap_notes_api.py::test_generate_draft_unauthorized",
         "integration/test_soap_notes_api.py::test_get_soap_note_success",
         "integration/test_soap_notes_api.py::test_get_soap_note_not_found",
         "integration/test_soap_notes_api.py::test_get_soap_note_unauthorized",
+        "integration/test_soap_notes_api.py::test_retry_generation",
     ]),
     "tc08": ("Code Suggestions Displayed (Ranked)", [
         "integration/test_code_suggestions.py",

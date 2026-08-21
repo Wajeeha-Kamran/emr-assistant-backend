@@ -23,6 +23,12 @@ class SOAPSectionType(str, enum.Enum):
     PLAN = "PLAN"
 
 
+class GenerationStatus(str, enum.Enum):
+    processing = "processing"
+    completed = "completed"
+    failed = "failed"
+
+
 class SOAPNote(Base):
     __tablename__ = "soap_notes"
 
@@ -33,6 +39,19 @@ class SOAPNote(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     last_edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    generation_status: Mapped[GenerationStatus] = mapped_column(Enum(GenerationStatus), default=GenerationStatus.completed, nullable=False)
+    generation_error: Mapped[str | None] = mapped_column(String, nullable=True)
+    codes_generation_status: Mapped[GenerationStatus | None] = mapped_column(Enum(GenerationStatus), nullable=True)
+    codes_generation_error: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # When each background job last started, which is not the same thing as when
+    # the note was created. A note is created once; generation can be re-run, and
+    # code suggestion is triggered later still, after the doctor has read the
+    # draft. Stall detection needs the moment the job began or it reports a job
+    # that started seconds ago as abandoned. See AttentionService.is_soap_stalled.
+    generation_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    codes_generation_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     session = relationship("ConsultationSession")
     sections = relationship("SOAPSection", back_populates="note", cascade="all, delete-orphan")

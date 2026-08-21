@@ -43,13 +43,32 @@ def test_data():
     db.close()
 
 
-def test_generate_and_save_draft_success(test_data):
+def test_generate_and_save_draft_setup(test_data):
     db, doc, session, _ = test_data
     
     note = SOAPNoteService.generate_and_save_draft(db, session.id, doc.id)
     assert note is not None
     assert note.session_id == session.id
     assert note.status == SOAPNoteStatus.DRAFT
+    from app.models.soap_note import GenerationStatus
+    assert note.generation_status == GenerationStatus.processing
+    
+    sections = db.query(SOAPSection).filter(SOAPSection.soap_note_id == note.id).all()
+    assert len(sections) == 0
+
+def test_generate_in_background_success(test_data):
+    db, doc, session, _ = test_data
+    
+    # 1. Setup draft
+    note = SOAPNoteService.generate_and_save_draft(db, session.id, doc.id)
+    
+    # 2. Run background task
+    SOAPNoteService.generate_in_background(session.id, note.id)
+    
+    # 3. Verify
+    db.refresh(note)
+    from app.models.soap_note import GenerationStatus
+    assert note.generation_status == GenerationStatus.completed
     
     sections = db.query(SOAPSection).filter(SOAPSection.soap_note_id == note.id).all()
     assert len(sections) == 4
@@ -73,6 +92,7 @@ def test_ownership_check(test_data):
 
 def test_enforce_four_sections(test_data):
     db, doc, session, _ = test_data
+    note = SOAPNoteService.generate_and_save_draft(db, session.id, doc.id)
     
     with patch("app.services.soap_service.SOAPService.generate_draft") as mock_gen:
         # Mock returns only 3 sections instead of 4
@@ -83,12 +103,13 @@ def test_enforce_four_sections(test_data):
             # Missing "plan"
         }
         
-        with pytest.raises(SOAPValidationError):
-            SOAPNoteService.generate_and_save_draft(db, session.id, doc.id)
+        # It won't raise an exception now, it will catch it and set failed
+        SOAPNoteService.generate_in_background(session.id, note.id)
             
-        # Verify it wasn't persisted
-        note = db.query(SOAPNote).filter(SOAPNote.session_id == session.id).first()
-        assert note is None
+        db.refresh(note)
+        from app.models.soap_note import GenerationStatus
+        assert note.generation_status == GenerationStatus.failed
+        assert "missing required sections" in (note.generation_error or "").lower()
 
 
 def test_prevent_signed_note_overwrite(test_data):

@@ -438,7 +438,7 @@
           "soap_notes"
         ],
         "summary": "Generate Soap Note Draft",
-        "description": "Generate a draft SOAP note from the completed transcript.\n\nRequires a transcript with status `completed`; otherwise returns 409.\n\nThe pipeline is extractive: every word in the note comes from the transcript,\nnothing is invented. Patient speech becomes Subjective; doctor speech is\nclassified sentence by sentence into Objective, Assessment and Plan.\nQuestions, greetings and announcements are excluded, since they document\nnothing.\n\nRegenerating replaces an existing draft and its code suggestions. A signed\nnote cannot be regenerated and returns 409.\n\n**This is a draft for clinical review.** Classification of Assessment in\nparticular is known to be weak — diagnostic statements are frequently filed\nunder Objective. Clients must present this as editable. See\ndocs/module_3_soap_classification.md.",
+        "description": "Start generating a draft SOAP note from the completed transcript.\n\nRequires a transcript with status `completed`; otherwise returns 409.\n\nThe pipeline is extractive: every word in the note comes from the transcript,\nnothing is invented. Patient speech becomes Subjective; doctor speech is\nclassified sentence by sentence into Objective, Assessment and Plan.\nQuestions, greetings and announcements are excluded, since they document\nnothing.\n\nRegenerating replaces an existing draft and its code suggestions. A signed\nnote cannot be regenerated and returns 409.\n\n**This is a draft for clinical review.** Classification of Assessment in\nparticular is known to be weak — diagnostic statements are frequently filed\nunder Objective. Clients must present this as editable. See\ndocs/module_3_soap_classification.md.\n\nReturns 202 Accepted. Poll GET to check status.",
         "operationId": "generate_soap_note_draft_api_v1_sessions__session_id__soap_notes_generate_post",
         "security": [
           {
@@ -457,7 +457,7 @@
           }
         ],
         "responses": {
-          "201": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -506,6 +506,54 @@
         ],
         "responses": {
           "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SOAPNoteResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{session_id}/soap-notes/retry": {
+      "post": {
+        "tags": [
+          "soap_notes"
+        ],
+        "summary": "Retry Soap Note Generation",
+        "description": "Re-run SOAP note generation for a session whose generation failed or stalled.\n\nReturns 409 if generation is already running. Note that this endpoint can also\nbe used if generation is stuck in `processing`.",
+        "operationId": "retry_soap_note_generation_api_v1_sessions__session_id__soap_notes_retry_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -601,7 +649,7 @@
           "code_suggestions"
         ],
         "summary": "Generate Code Suggestions",
-        "description": "Generate ranked ICD-10 and CPT suggestions for a note.\n\nDiagnosis codes are drawn from the Assessment section and procedure codes\nfrom the Plan section, matched against the reference code set by clinical\nsimilarity. Returns five of each, ranked 1 to 10 with no gaps.\n\nRegenerating replaces the previous suggestions. A signed note returns 409.\n\nSuggestions are proposals for the clinician to accept, not billing\ndecisions.",
+        "description": "Start generating ranked ICD-10 and CPT suggestions for a note.\n\nDiagnosis codes are drawn from the Assessment section and procedure codes\nfrom the Plan section, matched against the reference code set by clinical\nsimilarity. Returns five of each, ranked 1 to 10 with no gaps.\n\nRegenerating replaces the previous suggestions. A signed note returns 409.\n\nSuggestions are proposals for the clinician to accept, not billing\ndecisions.\n\nReturns 202 Accepted. Poll GET to check status.",
         "operationId": "generate_code_suggestions_api_v1_soap_notes__note_id__code_suggestions_generate_post",
         "security": [
           {
@@ -620,7 +668,7 @@
           }
         ],
         "responses": {
-          "200": {
+          "202": {
             "description": "Successful Response",
             "content": {
               "application/json": {
@@ -630,6 +678,58 @@
                     "$ref": "#/components/schemas/CodeSuggestionResponse"
                   },
                   "title": "Response Generate Code Suggestions Api V1 Soap Notes  Note Id  Code Suggestions Generate Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/soap-notes/{note_id}/code-suggestions/retry": {
+      "post": {
+        "tags": [
+          "code_suggestions"
+        ],
+        "summary": "Retry Code Suggestions",
+        "description": "Re-run code suggestion generation for a session whose generation failed or stalled.\n\nReturns 409 if generation is already running. Note that this endpoint can also\nbe used if generation is stuck in `processing`.",
+        "operationId": "retry_code_suggestions_api_v1_soap_notes__note_id__code_suggestions_retry_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "note_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Note Id"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CodeSuggestionResponse"
+                  },
+                  "title": "Response Retry Code Suggestions Api V1 Soap Notes  Note Id  Code Suggestions Retry Post"
                 }
               }
             }
@@ -969,6 +1069,8 @@
         "type": "string",
         "enum": [
           "RESUME_TRANSCRIPTION",
+          "RETRY_SOAP_GENERATION",
+          "RETRY_CODES_GENERATION",
           "GENERATE_NOTE",
           "SIGN_NOTE",
           "RETRY_SYNC"
@@ -1031,6 +1133,10 @@
         "enum": [
           "TRANSCRIPT_FAILED",
           "TRANSCRIPT_STALLED",
+          "SOAP_GENERATION_FAILED",
+          "SOAP_GENERATION_STALLED",
+          "CODES_GENERATION_FAILED",
+          "CODES_GENERATION_STALLED",
           "NOTE_NOT_GENERATED",
           "NOT_SIGNED",
           "SYNC_FAILED"
@@ -1259,6 +1365,15 @@
         ],
         "title": "DoctorResponse"
       },
+      "GenerationStatus": {
+        "type": "string",
+        "enum": [
+          "processing",
+          "completed",
+          "failed"
+        ],
+        "title": "GenerationStatus"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1284,6 +1399,41 @@
           },
           "status": {
             "$ref": "#/components/schemas/SOAPNoteStatus"
+          },
+          "generation_status": {
+            "$ref": "#/components/schemas/GenerationStatus"
+          },
+          "generation_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation Error"
+          },
+          "codes_generation_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GenerationStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "codes_generation_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codes Generation Error"
           },
           "created_at": {
             "type": "string",
@@ -1315,6 +1465,7 @@
           "id",
           "session_id",
           "status",
+          "generation_status",
           "created_at",
           "sections"
         ],

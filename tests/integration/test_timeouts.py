@@ -47,16 +47,23 @@ def active_session_with_transcript(db, auth_headers):
     
     return session.id
 
-def test_genuine_error_surfaces_within_5_seconds_for_nlp_timeout(auth_headers, active_session_with_transcript):
+def test_genuine_error_surfaces_within_5_seconds_for_nlp_timeout(auth_headers, active_session_with_transcript, db):
     """
-    Asserts that a genuine ERROR response returns to the caller within the 5-second 
-    robustness budget when the NLP engine times out. 
+    Asserts that a genuine ERROR surfaces within the 5-second 
+    robustness budget when the NLP engine times out in the background task. 
     
     NOTE: This does NOT test that processing completes in 5 seconds. It tests that 
     the system correctly cuts off a runaway process (mocked to sleep forever) and 
-    returns a 503 error to the client before 5 seconds have elapsed.
+    records a failure before 5 seconds have elapsed.
     """
+    from app.services.soap_note_service import SOAPNoteService
+    from app.models.soap_note import GenerationStatus, SOAPNote
+    
     client = TestClient(app)
+    
+    # Pre-create the processing draft
+    doc = db.query(Doctor).first()
+    note = SOAPNoteService.generate_and_save_draft(db, active_session_with_transcript, doc.id)
     
     from unittest.mock import patch, MagicMock
     def mock_sleep_forever(*args, **kwargs):
@@ -70,11 +77,15 @@ def test_genuine_error_surfaces_within_5_seconds_for_nlp_timeout(auth_headers, a
     with patch("app.services.soap_service.ClinicalBERTEngine.get_instance", return_value=mock_engine):
         with patch("app.core.config.settings.NLP_TIMEOUT_SECONDS", new=2):
             start_time = time.time()
-            response = client.post(f"/api/v1/sessions/{active_session_with_transcript}/soap-notes/generate", headers=auth_headers)
+            
+            # Run the background task synchronously for the test
+            SOAPNoteService.generate_in_background(active_session_with_transcript, note.id)
+            
             elapsed_time = time.time() - start_time
             
-            assert response.status_code == 503
-            assert response.json()["detail"] == "NLP Engine Timeout"
+            db.refresh(note)
+            assert note.generation_status == GenerationStatus.failed
+            assert "timeout" in (note.generation_error or "").lower()
             assert elapsed_time < 5.0, f"Error did not surface within 5 seconds! Took {elapsed_time}s"
 
 def test_dynamic_asr_timeout_logic(db):

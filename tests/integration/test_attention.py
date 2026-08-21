@@ -24,7 +24,7 @@ from app.models.audio import AudioMetadata
 from app.models.doctor import Doctor
 from app.models.session import ConsultationSession, SessionStatus
 from app.models.signature import Signature
-from app.models.soap_note import SOAPNote, SOAPNoteStatus, SyncStatus
+from app.models.soap_note import SOAPNote, SOAPNoteStatus, SyncStatus, GenerationStatus
 from app.models.transcript import Transcript, TranscriptStatus
 
 PAST_GRACE = settings.ATTENTION_GRACE_MINUTES + 10
@@ -107,13 +107,30 @@ def add_note(
     doctor: Doctor,
     status: SOAPNoteStatus,
     sync_status: SyncStatus | None = None,
+    generation_status: GenerationStatus = GenerationStatus.completed,
+    codes_generation_status: GenerationStatus | None = None,
     age_minutes: float = 0,
+    generation_started_minutes_ago: float | None = None,
+    codes_generation_started_minutes_ago: float | None = None,
 ) -> SOAPNote:
+    # The started_at arguments default to None so the existing tests keep
+    # exercising the created_at fallback, which is what rows written before
+    # those columns existed will hit.
     note = SOAPNote(
         session_id=session.id,
         status=status,
         sync_status=sync_status,
+        generation_status=generation_status,
+        codes_generation_status=codes_generation_status,
         created_at=ago(age_minutes),
+        generation_started_at=(
+            ago(generation_started_minutes_ago)
+            if generation_started_minutes_ago is not None else None
+        ),
+        codes_generation_started_at=(
+            ago(codes_generation_started_minutes_ago)
+            if codes_generation_started_minutes_ago is not None else None
+        ),
     )
     db.add(note)
     db.commit()
@@ -251,7 +268,7 @@ def test_reports_an_unsigned_note(client: TestClient, db: Session, doc: Doctor, 
     session = make_session(db, doc, age_minutes=PAST_GRACE)
     add_audio(db, session)
     add_transcript(db, session, TranscriptStatus.completed, age_minutes=PAST_GRACE)
-    note = add_note(db, session, doc, SOAPNoteStatus.DRAFT, age_minutes=PAST_GRACE)
+    note = add_note(db, session, doc, SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.completed, age_minutes=PAST_GRACE)
 
     body = get_items(client, auth)
     assert body["count"] == 1
@@ -266,9 +283,95 @@ def test_ignores_a_note_being_written_now(client: TestClient, db: Session, doc: 
     session = make_session(db, doc, age_minutes=2)
     add_audio(db, session)
     add_transcript(db, session, TranscriptStatus.completed, age_minutes=2)
-    add_note(db, session, doc, SOAPNoteStatus.DRAFT, age_minutes=2)
+    add_note(db, session, doc, SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.completed, age_minutes=2)
 
     assert get_items(client, auth)["count"] == 0
+
+def test_reports_soap_generation_failed(client: TestClient, db: Session, doc: Doctor, auth):
+    session = make_session(db, doc, age_minutes=5)
+    add_audio(db, session)
+    add_transcript(db, session, TranscriptStatus.completed, age_minutes=5)
+    note = add_note(db, session, doc, SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.failed, age_minutes=5)
+
+    body = get_items(client, auth)
+    assert body["count"] == 1
+    assert body["items"][0]["reason"] == "SOAP_GENERATION_FAILED"
+    assert body["items"][0]["action"] == "RETRY_SOAP_GENERATION"
+
+def test_reports_soap_generation_stalled(client: TestClient, db: Session, doc: Doctor, auth):
+    session = make_session(db, doc, age_minutes=5)
+    add_audio(db, session)
+    add_transcript(db, session, TranscriptStatus.completed, age_minutes=5)
+    note = add_note(db, session, doc, SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.processing, age_minutes=5)
+
+    body = get_items(client, auth)
+    assert body["count"] == 1
+    assert body["items"][0]["reason"] == "SOAP_GENERATION_STALLED"
+    assert body["items"][0]["action"] == "RETRY_SOAP_GENERATION"
+
+def test_reports_codes_generation_failed(client: TestClient, db: Session, doc: Doctor, auth):
+    session = make_session(db, doc, age_minutes=5)
+    add_audio(db, session)
+    add_transcript(db, session, TranscriptStatus.completed, age_minutes=5)
+    note = add_note(db, session, doc, SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.completed, codes_generation_status=GenerationStatus.failed, age_minutes=5)
+
+    body = get_items(client, auth)
+    assert body["count"] == 1
+    assert body["items"][0]["reason"] == "CODES_GENERATION_FAILED"
+    assert body["items"][0]["action"] == "RETRY_CODES_GENERATION"
+
+def test_reports_codes_generation_stalled(client: TestClient, db: Session, doc: Doctor, auth):
+    session = make_session(db, doc, age_minutes=5)
+    add_audio(db, session)
+    add_transcript(db, session, TranscriptStatus.completed, age_minutes=5)
+    note = add_note(db, session, doc, SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.completed, codes_generation_status=GenerationStatus.processing, age_minutes=5)
+
+    body = get_items(client, auth)
+    assert body["count"] == 1
+    assert body["items"][0]["reason"] == "CODES_GENERATION_STALLED"
+    assert body["items"][0]["action"] == "RETRY_CODES_GENERATION"
+
+
+# The two tests above prove a stalled job is reported. These prove a job that is
+# genuinely running is not — which is the half that was missing, and the half
+# that fails if the deadline is measured from note.created_at instead of from
+# when the job started. Both notes here are old; only the jobs are new.
+
+def test_ignores_soap_generation_that_just_started(client: TestClient, db: Session, doc: Doctor, auth):
+    session = make_session(db, doc, age_minutes=PAST_GRACE)
+    add_audio(db, session)
+    add_transcript(db, session, TranscriptStatus.completed, age_minutes=PAST_GRACE)
+    # A retry on an old note: created long ago, generation restarted just now.
+    add_note(
+        db, session, doc, SOAPNoteStatus.DRAFT,
+        generation_status=GenerationStatus.processing,
+        age_minutes=PAST_GRACE,
+        generation_started_minutes_ago=0,
+    )
+
+    assert get_items(client, auth)["count"] == 0
+
+
+def test_ignores_codes_generation_that_just_started(client: TestClient, db: Session, doc: Doctor, auth):
+    session = make_session(db, doc, age_minutes=PAST_GRACE)
+    add_audio(db, session)
+    add_transcript(db, session, TranscriptStatus.completed, age_minutes=PAST_GRACE)
+    # The ordinary case: the doctor read the draft before asking for codes, so
+    # the note is far older than the job.
+    add_note(
+        db, session, doc, SOAPNoteStatus.DRAFT,
+        generation_status=GenerationStatus.completed,
+        codes_generation_status=GenerationStatus.processing,
+        age_minutes=PAST_GRACE,
+        codes_generation_started_minutes_ago=0,
+    )
+
+    # This note is old, unsigned and finished generating, so NOT_SIGNED is the
+    # correct row for it. What must not appear is a stall: the codes job started
+    # a moment ago. Asserting on the reason rather than the count keeps this
+    # test about stall detection and nothing else.
+    reasons = [item["reason"] for item in get_items(client, auth)["items"]]
+    assert "CODES_GENERATION_STALLED" not in reasons
 
 
 # ---------------------------------------------------------------------------
@@ -315,7 +418,7 @@ def test_reports_every_stage_at_once_newest_first(client: TestClient, db: Sessio
     unsigned = make_session(db, doc, age_minutes=70)
     add_audio(db, unsigned)
     add_transcript(db, unsigned, TranscriptStatus.completed, age_minutes=70)
-    add_note(db, unsigned, doc, SOAPNoteStatus.DRAFT, age_minutes=70)
+    add_note(db, unsigned, doc, SOAPNoteStatus.DRAFT, generation_status=GenerationStatus.completed, age_minutes=70)
 
     failed_sync = make_session(db, doc, age_minutes=80)
     add_audio(db, failed_sync)

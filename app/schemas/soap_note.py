@@ -1,7 +1,7 @@
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
-from app.models.soap_note import SOAPNoteStatus, SOAPSectionType
+from app.models.soap_note import SOAPNoteStatus, SOAPSectionType, GenerationStatus
 
 class SOAPSectionResponse(BaseModel):
     id: int
@@ -14,6 +14,10 @@ class SOAPNoteResponse(BaseModel):
     id: int
     session_id: int
     status: SOAPNoteStatus
+    generation_status: GenerationStatus
+    generation_error: Optional[str] = None
+    codes_generation_status: Optional[GenerationStatus] = None
+    codes_generation_error: Optional[str] = None
     created_at: datetime
     last_edited_at: Optional[datetime] = None
     sections: List[SOAPSectionResponse]

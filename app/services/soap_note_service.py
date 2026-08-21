@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.models.session import ConsultationSession
 from app.models.transcript import Transcript, TranscriptStatus, TranscriptSegment
-from app.models.soap_note import SOAPNote, SOAPSection, SOAPNoteStatus, SOAPSectionType
+from app.models.soap_note import SOAPNote, SOAPSection, SOAPNoteStatus, SOAPSectionType, GenerationStatus
 from app.services.soap_service import SOAPService
 from app.services.exceptions import SessionNotFoundError, SOAPValidationError, SOAPNoteAlreadySignedError, TranscriptNotReadyError, SOAPSectionNotFoundError
 
@@ -23,19 +23,7 @@ class SOAPNoteService:
         if not transcript or transcript.status != TranscriptStatus.completed:
             raise TranscriptNotReadyError("Completed transcript not found or not ready for this session")
 
-        segments_db = db.query(TranscriptSegment).filter(
-            TranscriptSegment.transcript_id == transcript.id
-        ).order_by(TranscriptSegment.start_time).all()
-
-        segments = [
-            {"speaker_role": seg.speaker_role, "text": seg.text}
-            for seg in segments_db
-        ]
-
-        # 3. Generation
-        draft_content = SOAPService.generate_draft(segments)
-
-        # 4. Persistence
+        # 3. Persistence Setup
         existing_note = db.query(SOAPNote).filter(SOAPNote.session_id == session_id).first()
         if existing_note:
             if existing_note.status == SOAPNoteStatus.SIGNED:
@@ -44,46 +32,17 @@ class SOAPNoteService:
             db.delete(existing_note)
             db.commit()
 
+        now = datetime.now(timezone.utc)
         note = SOAPNote(
             session_id=session_id,
             status=SOAPNoteStatus.DRAFT,
-            created_at=datetime.now(timezone.utc)
+            generation_status=GenerationStatus.processing,
+            created_at=now,
+            # Equal to created_at on a first generation, but they diverge on
+            # retry, and stall detection reads this one.
+            generation_started_at=now,
         )
         db.add(note)
-        db.flush() # flush to get note.id
-
-        sections = []
-        section_mapping = {
-            SOAPSectionType.SUBJECTIVE: draft_content.get("subjective", ""),
-            SOAPSectionType.OBJECTIVE: draft_content.get("objective", ""),
-            SOAPSectionType.ASSESSMENT: draft_content.get("assessment", ""),
-            SOAPSectionType.PLAN: draft_content.get("plan", ""),
-        }
-
-        for sec_type, text_content in section_mapping.items():
-            # if somehow the generated text is missing, handle gracefully but require the section
-            if text_content is None:
-                text_content = ""
-                
-            sec = SOAPSection(
-                soap_note_id=note.id,
-                section_type=sec_type,
-                content=text_content
-            )
-            sections.append(sec)
-            db.add(sec)
-
-        # 5. Validation Rule
-        # Enforce exactly 4 SOAPSection rows per SOAPNote explicitly
-        if len(sections) != 4:
-            db.rollback()
-            raise SOAPValidationError(f"Expected exactly 4 SOAP sections, got {len(sections)}")
-
-        # Additional safety check against the generated output
-        if not all(k in draft_content for k in ["subjective", "objective", "assessment", "plan"]):
-            db.rollback()
-            raise SOAPValidationError("Generated draft is missing required sections")
-
         db.commit()
         db.refresh(note)
         return note
@@ -112,3 +71,77 @@ class SOAPNoteService:
         db.commit()
         db.refresh(note)
         return note
+
+    @staticmethod
+    def generate_in_background(session_id: int, note_id: int) -> None:
+        import logging
+        from app.db.session import SessionLocal
+        logger = logging.getLogger(__name__)
+        db = SessionLocal()
+        try:
+            # 1. Fetch resources
+            note = db.query(SOAPNote).filter(SOAPNote.id == note_id).first()
+            if not note:
+                logger.error(f"SOAPNote {note_id} not found in background generation")
+                return
+
+            transcript = db.query(Transcript).filter(Transcript.session_id == session_id).first()
+            if not transcript or transcript.status != TranscriptStatus.completed:
+                raise TranscriptNotReadyError("Completed transcript not found or not ready for this session")
+
+            segments_db = db.query(TranscriptSegment).filter(
+                TranscriptSegment.transcript_id == transcript.id
+            ).order_by(TranscriptSegment.start_time).all()
+
+            segments = [
+                {"speaker_role": seg.speaker_role, "text": seg.text}
+                for seg in segments_db
+            ]
+
+            # 2. Generation
+            draft_content = SOAPService.generate_draft(segments)
+
+            # 3. Clear any existing sections (for retry)
+            db.query(SOAPSection).filter(SOAPSection.soap_note_id == note.id).delete()
+
+            # 4. Save new sections
+            sections = []
+            section_mapping = {
+                SOAPSectionType.SUBJECTIVE: draft_content.get("subjective", ""),
+                SOAPSectionType.OBJECTIVE: draft_content.get("objective", ""),
+                SOAPSectionType.ASSESSMENT: draft_content.get("assessment", ""),
+                SOAPSectionType.PLAN: draft_content.get("plan", ""),
+            }
+
+            for sec_type, text_content in section_mapping.items():
+                if text_content is None:
+                    text_content = ""
+                sec = SOAPSection(
+                    soap_note_id=note.id,
+                    section_type=sec_type,
+                    content=text_content
+                )
+                sections.append(sec)
+                db.add(sec)
+
+            if len(sections) != 4:
+                raise SOAPValidationError(f"Expected exactly 4 SOAP sections, got {len(sections)}")
+
+            if not all(k in draft_content for k in ["subjective", "objective", "assessment", "plan"]):
+                raise SOAPValidationError("Generated draft is missing required sections")
+
+            # 5. Finalize status
+            note.generation_status = GenerationStatus.completed
+            note.generation_error = None
+            db.commit()
+
+        except Exception as e:
+            db.rollback()
+            logger.exception("Background SOAP generation failed for note %s", note_id)
+            note = db.query(SOAPNote).filter(SOAPNote.id == note_id).first()
+            if note:
+                note.generation_status = GenerationStatus.failed
+                note.generation_error = str(e)
+                db.commit()
+        finally:
+            db.close()

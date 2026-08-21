@@ -165,12 +165,10 @@
       "event": [{
         "listen": "test",
         "script": { "type": "text/javascript", "exec": [
-          "pm.test('SOAP note created', () => pm.response.to.have.status(201));",
+          "pm.test('SOAP generation queued', () => pm.response.to.have.status(202));",
           "const j = pm.response.json();",
           "pm.collectionVariables.set('note_id', j.id);",
-          "pm.test('Exactly four sections', () => pm.expect(j.sections.length).to.eql(4));",
-          "pm.test('Status is DRAFT', () => pm.expect(j.status).to.eql('DRAFT'));",
-          "if (j.sections.length) pm.collectionVariables.set('section_id', j.sections[0].id);"
+          "pm.test('Status is DRAFT', () => pm.expect(j.status).to.eql('DRAFT'));"
         ]}
       }]
     },
@@ -179,8 +177,21 @@
       "request": {
         "method": "GET",
         "url": { "raw": "{{base_url}}/api/v1/sessions/{{session_id}}/soap-notes", "host": ["{{base_url}}"], "path": ["api","v1","sessions","{{session_id}}","soap-notes"] },
-        "description": "Retrieves the SOAP note for this session, with all four sections. Section content is encrypted at rest and decrypted transparently on read."
-      }
+        "description": "Retrieves the SOAP note for this session. Re-send this request until generation_status is 'completed', which indicates the background task has finished generating sections.\n\nSection content is encrypted at rest and decrypted transparently on read."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('SOAP note retrieved', () => pm.response.to.have.status(200));",
+          "const j = pm.response.json();",
+          "if (j.generation_status === 'completed') {",
+          "  pm.test('Exactly four sections', () => pm.expect(j.sections.length).to.eql(4));",
+          "  if (j.sections.length) pm.collectionVariables.set('section_id', j.sections[0].id);",
+          "} else {",
+          "  console.log('generation_status is ' + j.generation_status + ' — send this request again.');",
+          "}"
+        ]}
+      }]
     },
     {
       "name": "10. Edit SOAP Section (TC-03)",
@@ -208,21 +219,31 @@
       "event": [{
         "listen": "test",
         "script": { "type": "text/javascript", "exec": [
-          "pm.test('Suggestions generated', () => pm.response.to.have.status(200));",
-          "const j = pm.response.json();",
-          "if (j.length) pm.collectionVariables.set('suggestion_id', j[0].id);",
-          "pm.test('Ranks are sequential from 1', () =>",
-          "  j.forEach((s,i) => pm.expect(s.rank).to.eql(i+1)));"
+          "pm.test('Suggestions generation queued', () => pm.response.to.have.status(202));"
         ]}
       }]
     },
     {
-      "name": "12. Get Code Suggestions",
+      "name": "12. Get Code Suggestions — poll until generated",
       "request": {
         "method": "GET",
         "url": { "raw": "{{base_url}}/api/v1/soap-notes/{{note_id}}/code-suggestions", "host": ["{{base_url}}"], "path": ["api","v1","soap-notes","{{note_id}}","code-suggestions"] },
-        "description": "Returns the stored suggestions ordered by rank, each with code, description, code_type, confidence_score and accepted flag."
-      }
+        "description": "Returns the stored suggestions ordered by rank. If the list is empty, wait a moment and re-send until generation completes."
+      },
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Suggestions retrieved', () => pm.response.to.have.status(200));",
+          "const j = pm.response.json();",
+          "if (j.length) {",
+          "  pm.collectionVariables.set('suggestion_id', j[0].id);",
+          "  pm.test('Ranks are sequential from 1', () =>",
+          "    j.forEach((s,i) => pm.expect(s.rank).to.eql(i+1)));",
+          "} else {",
+          "  console.log('No suggestions yet — send this request again.');",
+          "}"
+        ]}
+      }]
     },
     {
       "name": "13. Accept a Code Suggestion (UC-08 accept/remove)",
