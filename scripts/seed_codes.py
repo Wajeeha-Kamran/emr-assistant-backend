@@ -16,7 +16,9 @@ from app.models.code_reference import CodeReference, CodeType
 # visit codes use the CPT 2024 wording, which replaced the old time ranges
 # ("30-44 minutes") with a single threshold ("30 minutes must be met or
 # exceeded") - quoting the old form would state something no longer true of
-# the code set.
+# the code set. A second pass on 21 August 2026 removed the indefinite article
+# from the office visit descriptors: CPT reads "and low level of medical
+# decision making", not "and a low level".
 #
 # This is a demonstration set, not a coding authority. The published ICD-10-CM
 # release runs to roughly 70,000 codes and a real deployment would load it in
@@ -107,11 +109,11 @@ SEED_CODES = [
     # CPT - office visits
     # ------------------------------------------------------------------
     {"code": "99212", "description": "Office or other outpatient visit for the evaluation and management of an established patient, which requires a medically appropriate history and/or examination and straightforward medical decision making. When using total time on the date of the encounter for code selection, 10 minutes must be met or exceeded.", "code_type": CodeType.CPT},
-    {"code": "99213", "description": "Office or other outpatient visit for the evaluation and management of an established patient, which requires a medically appropriate history and/or examination and a low level of medical decision making. When using total time on the date of the encounter for code selection, 20 minutes must be met or exceeded.", "code_type": CodeType.CPT},
-    {"code": "99214", "description": "Office or other outpatient visit for the evaluation and management of an established patient, which requires a medically appropriate history and/or examination and a moderate level of medical decision making. When using total time on the date of the encounter for code selection, 30 minutes must be met or exceeded.", "code_type": CodeType.CPT},
-    {"code": "99215", "description": "Office or other outpatient visit for the evaluation and management of an established patient, which requires a medically appropriate history and/or examination and a high level of medical decision making. When using total time on the date of the encounter for code selection, 40 minutes must be met or exceeded.", "code_type": CodeType.CPT},
-    {"code": "99203", "description": "Office or other outpatient visit for the evaluation and management of a new patient, which requires a medically appropriate history and/or examination and a low level of medical decision making. When using total time on the date of the encounter for code selection, 30 minutes must be met or exceeded.", "code_type": CodeType.CPT},
-    {"code": "99204", "description": "Office or other outpatient visit for the evaluation and management of a new patient, which requires a medically appropriate history and/or examination and a moderate level of medical decision making. When using total time on the date of the encounter for code selection, 45 minutes must be met or exceeded.", "code_type": CodeType.CPT},
+    {"code": "99213", "description": "Office or other outpatient visit for the evaluation and management of an established patient, which requires a medically appropriate history and/or examination and low level of medical decision making. When using total time on the date of the encounter for code selection, 20 minutes must be met or exceeded.", "code_type": CodeType.CPT},
+    {"code": "99214", "description": "Office or other outpatient visit for the evaluation and management of an established patient, which requires a medically appropriate history and/or examination and moderate level of medical decision making. When using total time on the date of the encounter for code selection, 30 minutes must be met or exceeded.", "code_type": CodeType.CPT},
+    {"code": "99215", "description": "Office or other outpatient visit for the evaluation and management of an established patient, which requires a medically appropriate history and/or examination and high level of medical decision making. When using total time on the date of the encounter for code selection, 40 minutes must be met or exceeded.", "code_type": CodeType.CPT},
+    {"code": "99203", "description": "Office or other outpatient visit for the evaluation and management of a new patient, which requires a medically appropriate history and/or examination and low level of medical decision making. When using total time on the date of the encounter for code selection, 30 minutes must be met or exceeded.", "code_type": CodeType.CPT},
+    {"code": "99204", "description": "Office or other outpatient visit for the evaluation and management of a new patient, which requires a medically appropriate history and/or examination and moderate level of medical decision making. When using total time on the date of the encounter for code selection, 45 minutes must be met or exceeded.", "code_type": CodeType.CPT},
     {"code": "99396", "description": "Periodic comprehensive preventive medicine reevaluation and management of an individual including an age and gender appropriate history, examination, counseling/anticipatory guidance/risk factor reduction interventions, and the ordering of laboratory/diagnostic procedures, established patient; 40-64 years", "code_type": CodeType.CPT},
 
     # ------------------------------------------------------------------
@@ -123,7 +125,7 @@ SEED_CODES = [
     {"code": "83036", "description": "Hemoglobin; glycosylated (A1C)", "code_type": CodeType.CPT},
     {"code": "82947", "description": "Glucose; quantitative, blood (except reagent strip)", "code_type": CodeType.CPT},
     {"code": "84443", "description": "Thyroid stimulating hormone (TSH)", "code_type": CodeType.CPT},
-    {"code": "85025", "description": "Blood count; complete (CBC), automated (Hgb, Hct, RBC, WBC and platelet count), and automated differential WBC count", "code_type": CodeType.CPT},
+    {"code": "85025", "description": "Blood count; complete (CBC), automated (Hgb, Hct, RBC, WBC and platelet count) and automated differential WBC count", "code_type": CodeType.CPT},
     {"code": "81002", "description": "Urinalysis, by dip stick or tablet reagent for bilirubin, glucose, hemoglobin, ketones, leukocytes, nitrite, pH, protein, specific gravity, urobilinogen, any number of these constituents; non-automated, without microscopy", "code_type": CodeType.CPT},
     {"code": "87880", "description": "Infectious agent antigen detection by immunoassay with direct optical observation; Streptococcus, group A", "code_type": CodeType.CPT},
 
