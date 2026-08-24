@@ -1,0 +1,94 @@
+{
+  "run": "3",
+  "recorded_at": "2026-08-24T18:18:11.508471+00:00",
+  "dataset": [
+    "consult_1.wav",
+    "consult_2.wav",
+    "consult_3.wav",
+    "consult_4.wav"
+  ],
+  "iterations": 10,
+  "stage_successes": {
+    "session_create": 10,
+    "start_recording": 10,
+    "stop_recording": 10,
+    "transcript_complete": 10,
+    "soap_generation": 10,
+    "code_suggestion": 10,
+    "emr_sync": 10,
+    "retention": 10
+  },
+  "pipeline_success_rate": 100.0,
+  "iterations_detail": [
+    {
+      "iteration": 1,
+      "clip": "consult_1.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 175.2
+    },
+    {
+      "iteration": 2,
+      "clip": "consult_2.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 150.0
+    },
+    {
+      "iteration": 3,
+      "clip": "consult_3.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 162.4
+    },
+    {
+      "iteration": 4,
+      "clip": "consult_4.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 300.2
+    },
+    {
+      "iteration": 5,
+      "clip": "consult_1.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 194.5
+    },
+    {
+      "iteration": 6,
+      "clip": "consult_2.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 166.2
+    },
+    {
+      "iteration": 7,
+      "clip": "consult_3.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 146.3
+    },
+    {
+      "iteration": 8,
+      "clip": "consult_4.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 288.3
+    },
+    {
+      "iteration": 9,
+      "clip": "consult_1.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 159.0
+    },
+    {
+      "iteration": 10,
+      "clip": "consult_2.wav",
+      "result": "SUCCESS",
+      "failed_at": null,
+      "seconds": 137.1
+    }
+  ]
+}
