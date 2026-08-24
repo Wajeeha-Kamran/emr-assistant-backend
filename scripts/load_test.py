@@ -135,11 +135,34 @@ async def run_session(client: httpx.AsyncClient, audio: bytes,
             await asyncio.sleep(0.25)
         asr_s = time.perf_counter() - asr_start
 
+        # SOAP generation became asynchronous in c027a07. The endpoint now
+        # returns 202 with generation_status "processing" and the classifier
+        # runs in a background task, so the POST alone no longer measures
+        # anything useful. Time to a usable note is the POST plus the polling —
+        # which is what the 15s SRS target always meant. 200/201 are still
+        # accepted so this script also works against a pre-c027a07 build, and a
+        # response with no generation_status field is treated as already done.
         soap_start = time.perf_counter()
         soap = await client.post(f"{BASE}/sessions/{sid}/soap-notes/generate",
                                  headers=headers)
-        if soap.status_code != 201:
+        if soap.status_code not in (200, 201, 202):
             return False, asr_s, 0.0, f"soap {soap.status_code}: {soap.text[:120]}"
+
+        deadline = time.perf_counter() + 600
+        while True:
+            note = await client.get(f"{BASE}/sessions/{sid}/soap-notes",
+                                    headers=headers)
+            if note.status_code == 200:
+                body = note.json()
+                gen = body.get("generation_status", "completed")
+                if gen == "completed":
+                    break
+                if gen == "failed":
+                    return False, asr_s, 0.0, (
+                        f"soap generation failed: {body.get('generation_error')}")
+            if time.perf_counter() > deadline:
+                return False, asr_s, 0.0, "soap generation timeout (600s)"
+            await asyncio.sleep(0.25)
         soap_s = time.perf_counter() - soap_start
 
         return True, asr_s, soap_s, None

@@ -113,8 +113,20 @@ class ASRService:
                     transcript_id=transcript.id,
                     speaker_role=seg["speaker_role"],
                     text=seg["text"],
-                    start_time=seg["start"],
-                    end_time=seg["end"]
+                    # float() is not cosmetic. Whisper returns numpy.float64,
+                    # and psycopg2 has no adapter for it, so it falls back to
+                    # the repr - which under numpy 2 is "np.float64(0.0)"
+                    # rather than "0.0". That lands in the SQL unquoted and
+                    # PostgreSQL reads "np" as a schema name, failing with
+                    # InvalidSchemaName and taking the whole transcript with it.
+                    #
+                    # The pyannote path happens to hide this, because
+                    # pyannote's Segment.start/.end are Python floats. Only the
+                    # fallback diarizers pass Whisper's own numbers straight
+                    # through, so the bug appears exactly when the system is
+                    # already degraded - the worst moment to lose the data.
+                    start_time=float(seg["start"]),
+                    end_time=float(seg["end"])
                 )
                 db.add(db_seg)
                 

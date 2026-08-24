@@ -90,16 +90,57 @@ def main():
                 continue
             stage_successes["transcript_complete"] += 1
             
+            # Both generation stages became asynchronous in c027a07: each returns
+            # 202 and the model runs in a background task, so the response no
+            # longer carries the result. A stage is complete when its status
+            # column reads "completed", and both columns live on the note, so
+            # both are polled from the same endpoint.
+            #
+            # 200/201 are still accepted so this script works against a
+            # pre-c027a07 build, where a missing status field means the work was
+            # already done inline by the time the call returned.
+            def wait_for(field, session_id, timeout_s=60.0):
+                """Poll the note until `field` leaves "processing"."""
+                waited = 0.0
+                while waited < timeout_s:
+                    r = client.get(f"/api/v1/sessions/{session_id}/soap-notes",
+                                   headers=headers)
+                    if r.status_code == 200:
+                        state = r.json().get(field, "completed")
+                        if state in ("completed", None):
+                            return True, r.json()
+                        if state == "failed":
+                            return False, r.json()
+                    time.sleep(0.5)
+                    waited += 0.5
+                return False, None
+
             # 4. Generate Draft
             resp = client.post(f"/api/v1/sessions/{session_id}/soap-notes/generate", headers=headers)
-            if resp.status_code != 201:
+            if resp.status_code not in [200, 201, 202]:
+                print(f"Iteration {i+1}: SOAP generate returned {resp.status_code}")
+                continue
+            note_id = resp.json()["id"]
+
+            ok, body = wait_for("generation_status", session_id)
+            if not ok:
+                err = (body or {}).get("generation_error")
+                print(f"Iteration {i+1}: SOAP generation did not complete ({err})")
                 continue
             stage_successes["soap_generation"] += 1
-            note_id = resp.json()["id"]
-            
-            # 5. Code Suggestion
+
+            # 5. Code Suggestion. An empty list is a completed run, not a
+            # failure: a note with nothing codable in Assessment and Plan
+            # legitimately has no codes, so the status is what decides.
             c_resp = client.post(f"/api/v1/soap-notes/{note_id}/code-suggestions/generate", headers=headers)
-            if c_resp.status_code not in [200, 201]:
+            if c_resp.status_code not in [200, 201, 202]:
+                print(f"Iteration {i+1}: code generate returned {c_resp.status_code}")
+                continue
+
+            ok, body = wait_for("codes_generation_status", session_id)
+            if not ok:
+                err = (body or {}).get("codes_generation_error")
+                print(f"Iteration {i+1}: code suggestion did not complete ({err})")
                 continue
             stage_successes["code_suggestion"] += 1
             

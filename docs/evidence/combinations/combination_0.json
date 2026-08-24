@@ -1,0 +1,55 @@
+{
+  "combination": 0,
+  "label": "whisper:base.en + pyannote",
+  "why": "The current system. Everything else is compared against this.",
+  "hyper_parameters": {
+    "whisper_model": "base.en (74M)",
+    "language": "en",
+    "word_timestamps": true,
+    "diarizer": "pyannote/speaker-diarization-3.1",
+    "num_speakers": 2,
+    "smoothing": "majority of 3 neighbouring words",
+    "doctor_identification": "question-count majority vote",
+    "device": "cpu"
+  },
+  "mean_word_accuracy": 86.2,
+  "mean_speaker_accuracy": 77.6,
+  "per_recording": [
+    {
+      "word_accuracy": 87.3,
+      "word_accuracy_no_numerals": 87.3,
+      "speaker_accuracy": 100.0,
+      "words_compared": 191,
+      "file": "consult_1.wav",
+      "asr_seconds": 89.6,
+      "diarization_seconds": 183.1
+    },
+    {
+      "word_accuracy": 94.4,
+      "word_accuracy_no_numerals": 94.8,
+      "speaker_accuracy": 12.9,
+      "words_compared": 202,
+      "file": "consult_2.wav",
+      "asr_seconds": 15.9,
+      "diarization_seconds": 111.5
+    },
+    {
+      "word_accuracy": 87.8,
+      "word_accuracy_no_numerals": 87.8,
+      "speaker_accuracy": 97.5,
+      "words_compared": 161,
+      "file": "consult_3.wav",
+      "asr_seconds": 13.4,
+      "diarization_seconds": 104.3
+    },
+    {
+      "word_accuracy": 75.2,
+      "word_accuracy_no_numerals": 75.5,
+      "speaker_accuracy": 100.0,
+      "words_compared": 269,
+      "file": "consult_4.wav",
+      "asr_seconds": 24.6,
+      "diarization_seconds": 190.1
+    }
+  ]
+}
