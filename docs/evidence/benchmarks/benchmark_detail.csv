@@ -1,0 +1,25 @@
+run,audio_set,script,word_acc,speaker_acc,segments,ref_turns,audio_s,infer_s,realtime_x,cpu_s,vram_peak_gb,ram_peak_gb
+0. base.en + pyannote,human_distinct,1,86.9,100.0,14,16,95.0,15.58,0.16,12.19,2.0,2.58
+0. base.en + pyannote,human_distinct,2,94.8,12.4,9,17,78.7,7.53,0.1,7.3,2.0,2.63
+0. base.en + pyannote,human_distinct,3,87.8,98.1,14,17,77.7,8.29,0.11,7.53,2.0,2.62
+0. base.en + pyannote,human_distinct,4,83.6,100.0,14,16,137.3,12.36,0.09,12.19,2.0,2.65
+0. base.en + pyannote (synthetic),synthetic,1,95.3,100.0,14,16,108.0,9.87,0.09,9.55,2.0,2.67
+0. base.en + pyannote (synthetic),synthetic,2,98.6,100.0,15,17,87.9,8.26,0.09,8.03,2.0,2.65
+0. base.en + pyannote (synthetic),synthetic,3,93.4,99.4,16,17,85.6,8.21,0.1,7.97,2.0,2.67
+0. base.en + pyannote (synthetic),synthetic,4,93.3,100.0,14,16,142.6,13.87,0.1,13.39,2.0,2.69
+1. medium + pyannote,human_distinct,1,90.6,100.0,14,16,95.0,17.54,0.18,16.99,5.06,6.22
+1. medium + pyannote,human_distinct,2,92.0,13.2,9,17,78.7,15.9,0.2,15.72,5.06,6.22
+1. medium + pyannote,human_distinct,3,89.0,98.1,14,17,77.7,14.87,0.19,14.61,5.06,6.22
+1. medium + pyannote,human_distinct,4,84.5,100.0,14,16,137.3,26.16,0.19,25.94,5.06,6.22
+4. base.en + pyannote @ 20dB SNR,noise_20db,1,87.3,100.0,14,16,95.0,7.93,0.08,7.81,5.06,6.22
+4. base.en + pyannote @ 20dB SNR,noise_20db,2,93.0,96.5,17,17,78.7,7.33,0.09,7.16,5.06,6.22
+4. base.en + pyannote @ 20dB SNR,noise_20db,3,87.3,100.0,16,17,77.7,6.92,0.09,6.74,5.06,6.22
+4. base.en + pyannote @ 20dB SNR,noise_20db,4,83.3,100.0,14,16,137.3,12.51,0.09,12.33,5.06,6.22
+4. base.en + pyannote @ 10dB SNR,noise_10db,1,84.0,100.0,14,16,95.0,8.0,0.08,7.9,5.06,6.22
+4. base.en + pyannote @ 10dB SNR,noise_10db,2,86.4,96.2,15,17,78.7,7.59,0.1,7.42,5.06,6.22
+4. base.en + pyannote @ 10dB SNR,noise_10db,3,81.2,100.0,19,17,77.7,6.66,0.09,6.55,5.06,6.22
+4. base.en + pyannote @ 10dB SNR,noise_10db,4,80.0,100.0,14,16,137.3,12.58,0.09,12.38,5.06,6.22
+4. base.en + pyannote @ 5dB SNR,noise_5db,1,82.2,100.0,14,16,95.0,8.08,0.09,7.93,5.06,6.22
+4. base.en + pyannote @ 5dB SNR,noise_5db,2,80.8,97.7,13,17,78.7,7.44,0.09,7.28,5.06,6.22
+4. base.en + pyannote @ 5dB SNR,noise_5db,3,71.8,100.0,17,17,77.7,6.65,0.09,6.55,5.06,6.22
+4. base.en + pyannote @ 5dB SNR,noise_5db,4,78.5,100.0,14,16,137.3,12.5,0.09,12.32,5.06,6.22

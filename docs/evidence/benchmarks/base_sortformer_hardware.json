@@ -1,0 +1,11 @@
+{
+  "platform": "Linux-6.6.122+-x86_64-with-glibc2.35",
+  "python": "3.12.13",
+  "torch": "2.11.0+cu128",
+  "cpu_cores_physical": 1,
+  "cpu_cores_logical": 2,
+  "ram_total_gb": 13.6,
+  "gpu": "Tesla T4",
+  "gpu_vram_gb": 15.6,
+  "cuda": "12.8"
+}

@@ -1,0 +1,3 @@
+run,word_acc_mean,speaker_acc_mean,infer_s_mean,realtime_x_mean,cpu_s_mean,vram_peak_gb,ram_peak_gb,load_s,load_vram_gb
+2. medium + sortformer,89.02,99.85,15.99,0.17,14.1,3.5,3.62,10.64,1.01
+3. parakeet + pyannote,90.28,77.68,6.03,0.06,5.76,4.77,4.04,39.89,4.99
