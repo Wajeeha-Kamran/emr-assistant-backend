@@ -1,6 +1,6 @@
 {
-  "run": "2",
-  "recorded_at": "2026-08-24T19:57:44.180645+00:00",
+  "run": "3",
+  "recorded_at": "2026-08-24T18:18:11.508471+00:00",
   "dataset": [
     "consult_1.wav",
     "consult_2.wav",
@@ -25,70 +25,70 @@
       "clip": "consult_1.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 121.3
+      "seconds": 175.2
     },
     {
       "iteration": 2,
       "clip": "consult_2.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 95.1
+      "seconds": 150.0
     },
     {
       "iteration": 3,
       "clip": "consult_3.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 93.5
+      "seconds": 162.4
     },
     {
       "iteration": 4,
       "clip": "consult_4.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 167.2
+      "seconds": 300.2
     },
     {
       "iteration": 5,
       "clip": "consult_1.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 114.8
+      "seconds": 194.5
     },
     {
       "iteration": 6,
       "clip": "consult_2.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 92.0
+      "seconds": 166.2
     },
     {
       "iteration": 7,
       "clip": "consult_3.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 90.9
+      "seconds": 146.3
     },
     {
       "iteration": 8,
       "clip": "consult_4.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 171.1
+      "seconds": 288.3
     },
     {
       "iteration": 9,
       "clip": "consult_1.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 199.9
+      "seconds": 159.0
     },
     {
       "iteration": 10,
       "clip": "consult_2.wav",
       "result": "SUCCESS",
       "failed_at": null,
-      "seconds": 172.7
+      "seconds": 137.1
     }
   ]
 }

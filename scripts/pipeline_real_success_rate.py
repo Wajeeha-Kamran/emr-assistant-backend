@@ -39,7 +39,7 @@ from app.main import app
 # The evaluation dataset. Iterations rotate through these so every run covers
 # all four, rather than measuring one recording ten times.
 CLIPS = ["consult_1.wav", "consult_2.wav", "consult_3.wav", "consult_4.wav"]
-EVIDENCE_DIR = "docs/evidence"
+EVIDENCE_DIR = "docs/evidence/human_distinct"
 RESULTS_DIR = "docs/evidence/robustness"
 
 ITERATIONS = 10
