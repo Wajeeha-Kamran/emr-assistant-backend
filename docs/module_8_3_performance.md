@@ -1,4 +1,32 @@
-# Module 8.3 — Performance & Concurrency
+# Module 8.3 — Load and performance
+
+> **Superseded in part, 8 September 2026.** Sections 2.1 and 2.2 below were
+> measured on 15 August on `.venv` (Python 3.14) using `load_clip.wav` (65.76 s).
+> `scripts/load_test.py` was re-run on 8 September on `.venv312` (Python 3.12,
+> torch 2.14.0+cpu) using `consult_1.wav` (95.04 s) and produced materially
+> different results:
+>
+> | | 15 Aug | 8 Sep |
+> |---|---|---|
+> | Clip | load_clip.wav, 65.76 s, 3 windows | consult_1.wav, 95.04 s, 4 windows |
+> | ASR, single warm session | 9.87 s (~3.3 s/window) | 35.62 s (~8.9 s/window) |
+> | SOAP generation | 0.90 s | 0.88 s |
+> | 10 concurrent | **10 of 10** | **4 of 10** |
+> | Wall clock, 10 concurrent | 112.65 s | 149.14 s |
+> | Mean ASR under load | 60.49 s | 94.08 s |
+>
+> **The concurrency claim below is withdrawn.** "10 concurrent doctor sessions
+> without failure: met" is not reproducible; the September run fails with one
+> `RemoteProtocolError` and five `transcript failed`.
+>
+> **The 2.7x ASR slowdown is not yet explained.** Two variables changed at once
+> -- the clip and the Python environment -- so neither can be blamed. The
+> controlled test is to re-run `load_test.py` on `.venv312` against
+> `load_clip.wav`, the same file used in August. Until that is done, quote the
+> September figures and state the clip, because those are what the current
+> environment reproduces.
+>
+> SOAP generation is unchanged at ~0.9 s, so whatever changed is in ASR.
 
 **Date:** 15 August 2026
 **Requirements addressed:** SRS 2.3.3 (Efficiency, Scalability), SRS 2.1.4 (Constraints)
@@ -50,7 +78,7 @@ SRS target: 15 s. **Not met.**
 **Estimated for a 10-minute consultation under load: 423.9 s.**
 SRS target: 25 s. **Not met.**
 
-SRS requirement "support at least 10 concurrent doctor sessions without failure": **met.**
+SRS requirement "support at least 10 concurrent doctor sessions without failure": **met** *(withdrawn 8 Sep -- see the banner at the top; the September re-run scored 4 of 10).*
 
 Note: the mean ASR figure includes time spent queueing, not inference alone. Inference remains ~10 s per session; the remainder is waiting.
 
@@ -108,7 +136,7 @@ This outcome was anticipated in the project's own requirements. SRS 2.1.4 Constr
 
 | SRS 2.3.3 requirement | Target | Result | Status |
 |---|---|---|---|
-| 10 concurrent doctor sessions without failure | 10 | 10 / 10 | **Met** |
+| 10 concurrent doctor sessions without failure | 10 | 10 / 10 *(15 Aug)* / **4 of 10** *(8 Sep, current)* | **Not met** |
 | SOAP draft ready, single session, 10-min audio | 15 s | ~72 s (est.) | Not met — CPU limit |
 | SOAP draft ready, under concurrent load | 25 s | ~424 s (est.) | Not met — CPU limit |
 | API remains responsive during ML inference | — | Yes, no crashes or dropped connections after fix | **Met** |

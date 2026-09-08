@@ -258,10 +258,16 @@ this shows the classifier generalises across clinical scenarios but not
 necessarily across other people's phrasing.
 
 **Transcription is CPU-bound** and does not meet the SRS timing target without a
-GPU, which the SRS itself allows for. Whisper costs about 3.3 seconds per 30
-seconds of audio on this hardware, so a 10 minute consultation is roughly 70
-seconds of computation. Concurrency does meet its requirement, at 10 of 10
-sessions.
+GPU, which the SRS itself allows for.
+
+**Concurrency does not meet its requirement.** Re-measured 8 September 2026 on
+`.venv312`: **4 of 10** concurrent sessions succeeded, and a single warm session
+took 36.5 s for a 95 s clip against a 15 s target. An earlier measurement on
+15 August reported 10 of 10 and roughly 3.3 s of ASR per 30-second window; the
+current run measures about 8.9 s per window on a different clip and a different
+Python environment, and that difference is not yet explained. Both figures are
+recorded in `docs/module_8_3_performance.md`; the September one is the one to
+quote, because it is the one the current environment reproduces.
 
 ---
 

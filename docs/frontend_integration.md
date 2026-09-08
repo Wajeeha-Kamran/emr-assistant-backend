@@ -202,7 +202,8 @@ Two measured limitations are worth designing around:
   two voices are distinguishable and the pace is conversational, and degrades
   otherwise. Let the doctor correct a speaker label rather than presenting it as
   fact.
-- **Section placement can be wrong.** Classification is measured at 97.4%, which
+- **Section placement can be wrong.** Classification is measured at 97.4% on a
+  perfect transcript, and 82.1% end to end from real audio, which
   means roughly one sentence in forty lands in the wrong section. Editing must be
   easy.
 

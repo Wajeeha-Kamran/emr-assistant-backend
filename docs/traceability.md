@@ -2,6 +2,28 @@
 
 Generated from a full test run on 15 August 2026: **107 passed, 0 failed.**
 
+> **Updated 8 September 2026: 155 passed, 0 failed** on `.venv312` (Python 3.12,
+> NeMo 3.0.0, Sortformer diarization). Current per-test-case counts:
+>
+> | Test case | Description | Passed |
+> |---|---|---|
+> | TC-01 | Start Recording | 12 / 12 |
+> | TC-02 | Stop Recording + Audio Saved | 5 / 5 |
+> | TC-03 | Edit Draft Saved | 6 / 6 |
+> | TC-04 | Note Signed and Locked | 7 / 7 |
+> | TC-05 | Temporary Storage + Retention Policy | 10 / 10 |
+> | TC-06 | Diarized Transcript Generated | 13 / 13 |
+> | TC-07 | SOAP Draft Generated | 20 / 20 |
+> | TC-08 | Code Suggestions Displayed (Ranked) | 17 / 17 |
+> | TC-09 | Sync Success Update Status | 6 / 6 |
+> | TC-10 | Sync Failure Handling | 9 / 9 |
+> | | Supporting (auth, NFR, infrastructure) | 51 |
+>
+> The per-case column sums to 105 and supporting is 51, which is 156 against a
+> suite of 155. That is not an error: one test matches two test cases' patterns
+> and is counted under both, which is what the mapping is for. The table below
+> is the 15 August state and is kept as the record of that run.
+
 Reproduce with:
 
 ```
