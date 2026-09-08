@@ -1,0 +1,26 @@
+{
+  "1": {
+    "subjective": "Patient reports: I have been having really bad adage for about 4 days now. It's mostly on the right side, behind my eye. It drops bright light makes it much worse. know she has yesterday morning, but I have actually been sick. Sometimes there are little zigzag lines before it starts. Not sure this bad. I get normal headaches, but nothing like this. Just pelsomol when it gets bad. It does not help much.",
+    "objective": "Clinician noted: Your blood pressure is 140 over 90, which is elevated. Pupils are equal and reactive. No next -tiffness.",
+    "assessment": "Clinical impression: This looks like migraine with aura and your blood pressure is higher than what I would like.",
+    "plan": "Plan: I. I am going to prescribe some atriptin 50mg for the attacks. Keep a headache diary for 2 weeks. Come back in 2 weeks so we can recheck your blood pressure. If the pain becomes suddenly severe or your develop weakness or confusion, go to the emergency department immediately."
+  },
+  "2": {
+    "subjective": "Patient reports: I twisted my ankle playing football yesterday evening. The right one. Barely I limped off the pitch and it's been swollen since. No, nothing like that. Just ice last night and I kept it up on a cushion. Any. I sprained it about two years ago, the same side.",
+    "objective": "Clinician noted: There is swelling over the lateral malacious and tenderness on the outer side. No bony tenderness at the posterior edge. Range of motion is reduced by pain.",
+    "assessment": "Clinical impression: This is a lateral ankle sprain, grade 2. I do not think it is fractured and by the outower rules you do not need an x -ray.",
+    "plan": "Plan: You can bear weight just about. Rest, ice compression and elevation for the next three days. Take eye -proofing for 400 mg, 3 times daily with food. Start gentle movement after day 3. If you still cannot bear weight in a week, come back and we will arrange imaging. Realistically 4 to 6 weeks and only after you can hop on it without pain."
+  },
+  "3": {
+    "subjective": "Patient reports: My throat has been really sore since Saturday and it hurts to swallow. I felt hot last night. I didn't take my temperature. No cough at all actually. Yeah, under my jaw feels tender. My daughter had a sore throat last week. Yeah, okay.",
+    "objective": "Clinician noted: Temperature is 38 .2. The tonsils are enlarged with white exudite on both sides. There is tender cervical lymphodenum pethi, no cough reported.",
+    "assessment": "Clinical impression: That gives you a center score of 4, which makes bacterial infection likely rather than viral.",
+    "plan": "Plan: Right. I will start you on phenoxymythylene penicillin 250mg, 4 times a day for 10 days. Finish the whole course even when you feel better, take parasitomol for the pain and drink plenty of fluids. If you develop difficulty breathing or you cannot swallow your own saliva, that is an emergency and you should be seen straight away."
+  },
+  "4": {
+    "subjective": "Patient reports: That's right. It's been about 3 months since the last one. Honestly mixed. I have been taking the net form, net for mind every day, but my sugar are still higher than I had like in the morning. I have been checking most days, usually around 8 or 9 before breakfast. In the evening, it's better. Maybe 6 or 7. I have been trying to walk more, about 20 minutes most days. But work has been busy and I have missed some days. My weight is about the same at last time. No. Nothing like that. A bit of tingling in my toes, it's night sometimes. Not that I have noticed. Alright.",
+    "objective": "Clinician noted: Your blood pressure today is 132 over 84. Weight is unchanged at 86 kilograms. Your HP A1C has come back at 58 millimetres per month. Overall, this is type 2 diabetes with some optimal glycemic control and some early neuropathic symptoms that are not yet confirmed on examination. Since that is what usually drives the fasting numbers.",
+    "assessment": "Clinical impression: The Tingling is not showing up as a myelible nerve damage yet.",
+    "plan": "Plan: Okay. I am going to increase your metformin to 1 gram twice daily. Please continue monitoring your morning readings and bring the record next time. I will refer you for retinal pain. I will use retinal screening which is due and I would like to repeat bloods in 3 months. If the tingling in your feet gets worse or spread, let me know sooner rather than waiting. Focus on the morning's reading. First, I will book you in with the diabetes nurse to go through evening meals."
+  }
+}

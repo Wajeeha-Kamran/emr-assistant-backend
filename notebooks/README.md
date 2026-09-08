@@ -42,9 +42,16 @@ models, not of the deployed pipeline — the CPU pipeline timings are in
 
 ## Why the work is split across several notebooks
 
-NeMo (which Sortformer and Parakeet come from) pins `numpy < 2.0`, while
-`pyannote.audio` 4.0.7 and the current `numba` want `numpy 2.x`. Installing both
-in one Colab session broke whichever was installed first.
+NeMo 2.5.0, the version Colab's `pip` resolved to in August, required
+`numpy < 2.0`, while `pyannote.audio` 4.0.7 and the current `numba` want
+`numpy 2.x`. Installing both in one Colab session broke whichever was
+installed first.
+
+**Corrected 8 Sep 2026.** This is a property of NeMo 2.5.0, not of NeMo.
+NeMo 3.0.0 installs against `numpy 2.5.2` and `torch 2.14.0`, and NeMo 3.0.0,
+`openai-whisper` 20250625 and `pyannote.audio` 4.0.7 import together in one
+Python **3.12** environment on Windows with no version forcing at all. The
+conflict described below is historical.
 
 The workaround was to run Whisper and pyannote in one notebook, write the words
 and speaker spans to a JSON handoff file, and score the NeMo diarizers against
@@ -57,6 +64,12 @@ NeMo first and then forcing `numpy==1.26.4` last leaves all three importable in 
 single process. A full `pip freeze` of the working combination is written by that
 notebook as `pip_freeze_working.txt`.
 
+On NeMo 3.0.0 even that step is unnecessary — see the correction above. The
+only real constraint is the Python version: NeMo does not support Python 3.14,
+which the backend `.venv` currently uses. That, and not the operating system,
+was the actual blocker; the earlier note that Sortformer required Linux or
+WSL2 was wrong and is withdrawn.
+
 ## Results, in short
 
 Word and speaker accuracy on the four scripted consultations in
@@ -66,7 +79,7 @@ recordings and one collapse, not four mediocre ones.
 
 | Combination | Word | Speaker | Peak VRAM |
 |---|---|---|---|
-| base.en + pyannote **(deployed)** | 88.3% | 77.6% | 2.00 GB |
+| base.en + pyannote (fallback) | 88.3% | 77.6% | 2.00 GB |
 | medium + pyannote | 89.0% | 77.8% | 5.06 GB |
 | medium + Sortformer | 89.0% | 99.9% | 3.50 GB |
 | Parakeet + pyannote | 90.3% | 77.7% | 4.77 GB |

@@ -89,7 +89,9 @@ This is the deliverable. Point out:
 
 > Classification is measured at 97.4% against hand-labelled ground truth, and
 > checked against a held-out set of consultations the system was not developed
-> against, to make sure the rules were not fitted to the test data.
+> against, to make sure the rules were not fitted to the test data. That figure
+> is the classifier on a perfect transcript. End to end from real audio the same
+> four consultations score 82.1%, the difference being Whisper's word errors.
 
 ### 6. Codes, signing and sync (1 minute)
 
@@ -142,7 +144,8 @@ that edit step is a first-class part of the API rather than an afterthought. The
 system produces a starting point, not a record.
 
 **"Is this using ChatGPT?"**
-No. Whisper for speech, pyannote for speakers, ClinicalBERT for classification —
+No. Whisper for speech, NeMo Sortformer for speakers, ClinicalBERT for
+classification —
 all running locally. The generation is extractive, meaning every word in the note
 came from the transcript, so nothing can be invented. BioGPT was tested and
 deliberately left off the critical path because it produced text unrelated to

@@ -38,13 +38,25 @@ class DiarizationService:
       window                       48.8%   Correct approach — found 15 turns
                                            against 16 real ones — but fragile
                                            clustering and label assignment.
-      pyannote (default)              —    Purpose-built pipeline: VAD,
+      pyannote                     77.6%   Purpose-built pipeline: VAD,
                                            embeddings, clustering and overlap
-                                           handling developed together.
+                                           handling developed together. The
+                                           mean hides the failure: per script
+                                           100.0 / 12.4 / 98.1 / 100.0. The
+                                           clustering step swaps both speakers
+                                           on script 2.
+      sortformer (default)         99.9%   End-to-end NeMo model, no clustering
+                                           step to collapse. Same four scripts,
+                                           same scorer: 100.0 / 99.5 / 100.0 /
+                                           100.0.
 
     Module 2.2's revision note deferred the pyannote decision until diarization
     accuracy could be measured against real recordings. It was measured, it
-    fell short, and this is that upgrade.
+    fell short, and pyannote was that upgrade. Sortformer was measured against
+    pyannote on 8 Sep 2026 on the same recordings and replaced it as the
+    default; pyannote remains as the fallback.
+
+        evidence: docs/evidence/benchmarks/diarizer_head_to_head.csv
     """
 
     # -- public API -------------------------------------------------------
@@ -55,14 +67,24 @@ class DiarizationService:
         if not segments:
             return []
 
-        method = getattr(settings, "DIARIZATION_METHOD", "pyannote")
+        method = getattr(settings, "DIARIZATION_METHOD", "sortformer")
 
-        if method in ("pyannote", "window", "embedding") and not audio_path:
+        if method in ("sortformer", "pyannote", "window", "embedding") and not audio_path:
             logger.warning(
                 "Voice-based diarization requested but no audio_path was supplied; "
                 "falling back to the deprecated pause heuristic, which does not work."
             )
             return DiarizationService._diarize_by_pause(segments)
+
+        if method == "sortformer":
+            try:
+                return DiarizationService._diarize_by_sortformer(segments, audio_path)
+            except Exception as e:
+                logger.error(
+                    "Sortformer diarization failed (%s: %s); falling back to "
+                    "pyannote.", type(e).__name__, e
+                )
+                method = "pyannote"
 
         if method == "pyannote":
             try:
@@ -212,7 +234,20 @@ class DiarizationService:
         )
         return labels[0]
 
-    # -- pyannote method (default) ---------------------------------------
+    # -- turn-based methods: sortformer (default), pyannote (fallback) ----
+
+    @staticmethod
+    def _diarize_by_sortformer(segments: List[Dict[str, Any]],
+                               audio_path: str) -> List[Dict[str, Any]]:
+        from app.ml.sortformer_engine import SortformerEngine
+
+        turns: List[Tuple[float, float, str]] = (
+            SortformerEngine.get_instance().diarize(audio_path, num_speakers=2)
+        )
+        if not turns:
+            raise ValueError("Sortformer returned no speaker turns")
+        return DiarizationService._turns_to_segments(
+            segments, turns, "sortformer")
 
     @staticmethod
     def _diarize_by_pyannote(segments: List[Dict[str, Any]],
@@ -224,7 +259,21 @@ class DiarizationService:
         )
         if not turns:
             raise ValueError("pyannote returned no speaker turns")
+        return DiarizationService._turns_to_segments(
+            segments, turns, "pyannote")
 
+    @staticmethod
+    def _turns_to_segments(segments: List[Dict[str, Any]],
+                           turns: List[Tuple[float, float, str]],
+                           method: str) -> List[Dict[str, Any]]:
+        """
+        Attach speaker roles to Whisper output given [(start, end, label), ...].
+
+        Shared by every engine that produces timed speaker turns, so swapping
+        the diarizer changes only which model made the turns — the word
+        attribution, smoothing and doctor identification stay identical and a
+        measured accuracy difference is the model's, not the plumbing's.
+        """
         words = DiarizationService._collect_words(segments)
         if not words:
             # No word timestamps: fall back to labelling whole Whisper segments
@@ -247,9 +296,9 @@ class DiarizationService:
 
         out = DiarizationService._group(words, labels, doctor_label)
         n_doc = sum(1 for s in out if s["speaker_role"] == DOCTOR)
-        logger.info("Diarization (pyannote): %d words -> %d turns "
+        logger.info("Diarization (%s): %d words -> %d turns "
                     "(%d DOCTOR / %d PATIENT)",
-                    len(words), len(out), n_doc, len(out) - n_doc)
+                    method, len(words), len(out), n_doc, len(out) - n_doc)
         return out
 
     @staticmethod

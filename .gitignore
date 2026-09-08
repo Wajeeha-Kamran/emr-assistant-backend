@@ -1,4 +1,6 @@
 ﻿.venv/
+.venv312/
+.venv-nemo/
 .env
 __pycache__/
 *.pyc
@@ -18,3 +20,4 @@ scratch/
 # Eleven were committed by accident. The one the success-rate script needs
 # lives in docs/evidence/pipeline_clip.wav instead, byte for byte identical.
 /test_audio_*.wav
+docs/evidence/benchmarks/_sf16k/

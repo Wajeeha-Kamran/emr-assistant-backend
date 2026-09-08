@@ -67,6 +67,13 @@ Female doctor, male patient.
 | 4 — diabetes review | normal, long speeches | 75.5% | **100.0%** | 14 | 16 |
 | **Mean** | | **86.4%** | **77.6%** | | |
 
+> **Superseded 8 September 2026.** The speaker-accuracy column above is
+> pyannote's. Sortformer replaced it as the default diarizer and scores
+> 100.0 / 99.5 / 100.0 / 100.0 on these same four recordings, mean **99.9%**.
+> Word accuracy is unchanged -- the ASR is the same. The analysis below is
+> retained because it is the record of why the diarizer was replaced.
+> See `docs/module_9_3_sortformer.md`.
+
 ASR word accuracy **meets** the 85% target. Mean speaker accuracy does not, but the
 mean is misleading here and should not be quoted alone: **three of the four
 consultations scored 97.5% or above**, and the single failure is script 2, the
@@ -108,7 +115,8 @@ output in the repository for both.
 | Condition | Mean speaker accuracy | Scripts at or above the 85% target |
 |---|---|---|
 | Human, similar voices | 35.9% | 1 of 4 |
-| Human, distinct voices | 77.6% | 3 of 4 |
+| Human, distinct voices (pyannote) | 77.6% | 3 of 4 |
+| Human, distinct voices (Sortformer, current) | **99.9%** | **4 of 4** |
 | Synthetic, distinct voices | 99.9% | 4 of 4 |
 
 ---

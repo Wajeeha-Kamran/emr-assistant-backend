@@ -31,7 +31,15 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
-$python = Join-Path $root ".venv\Scripts\python.exe"
+# Prefer .venv312 (Python 3.12). NeMo does not support Python 3.14, so the
+# Sortformer diarizer only runs there; on .venv the service silently falls back
+# to pyannote. See docs/module_9_3_sortformer.md.
+$python = Join-Path $root ".venv312\Scripts\python.exe"
+if (-not (Test-Path $python)) {
+    $python = Join-Path $root ".venv\Scripts\python.exe"
+    Write-Host "WARNING: .venv312 not found, falling back to .venv." -ForegroundColor Yellow
+    Write-Host "         Sortformer will not load; diarization will use pyannote." -ForegroundColor Yellow
+}
 
 if (-not (Test-Path $python)) {
     throw "Cannot find $python. Run this from the repository root with the venv created."

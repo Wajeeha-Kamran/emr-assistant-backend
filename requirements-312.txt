@@ -19,7 +19,13 @@ apscheduler
 cryptography>=50.0.0
 bandit
 pip-audit
-resemblyzer
+# resemblyzer  -- omitted on Python 3.12: its webrtcvad dependency has no
+# wheel and cannot link against python312.lib on this machine (Python 3.12
+# is installed at the root of D:, which makes setuptools emit the malformed
+# linker path 'D:libs'). resemblyzer is used only by the 'embedding'
+# diarizer (66% accuracy), which now sits behind sortformer and pyannote
+# and is unreachable in practice. It also drags in the 'typing' 3.7
+# backport, which shadows the stdlib module on modern Python.
 pyannote.audio
 
 # Optional: NVIDIA NeMo, for the Sortformer diarizer (DIARIZATION_METHOD=sortformer).

@@ -23,14 +23,20 @@ class Settings(BaseSettings):
     #               never fires, because Whisper leaves no gaps between
     #               segments (93 gaps, mean 0.006s, max 0.560s). Retained only
     #               for the design-evolution record.
-    # "pyannote" = purpose-built diarization pipeline (default).
+    # "sortformer" = NeMo end-to-end diarization (default). 99.9% speaker
+    #                accuracy on the four scripted consultations; needs no
+    #                Hugging Face token. Requires: pip install nemo_toolkit[asr]
+    # "pyannote"   = purpose-built pipeline, kept as the automatic fallback.
+    #                77.6% on the same recordings — it swaps both speakers on
+    #                script 2. See docs/evidence/benchmarks/diarizer_head_to_head.csv
     # "window" / "embedding" / "pause" = earlier attempts, retained for
     # the design-evolution record. See DiarizationService for measurements.
-    DIARIZATION_METHOD: str = "pyannote"
+    DIARIZATION_METHOD: str = "sortformer"
 
-    # Hugging Face read token, required by pyannote. Licences must be
-    # accepted for pyannote/segmentation-3.0 and
-    # pyannote/speaker-diarization-3.1 on huggingface.co.
+    # Hugging Face read token, required only by the pyannote fallback.
+    # Licences must be accepted for pyannote/segmentation-3.0,
+    # pyannote/speaker-diarization-3.1 and
+    # pyannote/speaker-diarization-community-1 on huggingface.co.
     HF_TOKEN: str = ""
     DIARIZATION_PAUSE_THRESHOLD: float = 1.5  # only used by the deprecated method
     

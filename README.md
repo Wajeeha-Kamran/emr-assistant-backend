@@ -155,8 +155,8 @@ python -m scripts.load_test docs/evidence/load_clip.wav
 ## How it works
 
 ```
-audio ──> Whisper ──> pyannote ──> ClinicalBERT ──> ICD-10 / CPT ──> sign ──> EMR
-          words       who spoke     SOAP sections    suggestions             sync
+audio ──> Whisper ──> Sortformer ──> ClinicalBERT ──> ICD-10 / CPT ──> sign ──> EMR
+          words       who spoke      SOAP sections    suggestions             sync
 ```
 
 **Transcription.** OpenAI Whisper `base.en` with word level timestamps. It sits
@@ -164,8 +164,11 @@ behind an `ASREngine` protocol so another engine could be dropped in. Inference 
 serialised on a lock, because concurrent calls into a single Whisper model corrupt
 its attention cache — that was a real bug, not a precaution.
 
-**Speaker separation.** pyannote.audio, arrived at after three home-built
-approaches were built and measured. Word timestamps are mapped onto speaker turns,
+**Speaker separation.** NVIDIA NeMo Sortformer, with pyannote.audio as an
+automatic fallback, arrived at after three home-built approaches and then
+pyannote were built and measured. pyannote reached 77.6% mean speaker accuracy
+but swapped both speakers outright on one of the four recordings; Sortformer
+scores 99.9% on the same audio. See `docs/module_9_3_sortformer.md`. Word timestamps are mapped onto speaker turns,
 and the doctor is then identified by which speaker asks the questions. History
 taking is question driven, so this is a majority vote across the consultation
 rather than a guess based on who spoke first.
@@ -226,15 +229,16 @@ distinguishable and the pace is conversational. It degrades when the voices are
 similar, and when turn taking is rapid enough that turns become very short.
 Measured across three recording conditions:
 
-| Condition | Word accuracy | Speaker accuracy |
-|---|---|---|
-| Distinct voices, conversational | 86.4% | 77.6% |
-| Similar voices, rapid turns | 92.1% | 35.9% |
-| Synthetic control | 95.3% | 99.9% |
+| Condition | Word accuracy | Speaker accuracy (pyannote) | Speaker accuracy (Sortformer) |
+|---|---|---|---|
+| Distinct voices, conversational | 86.4% | 77.6% | **99.9%** |
+| Similar voices, rapid turns | 92.1% | 35.9% | not re-measured |
+| Synthetic control | 95.3% | 99.9% | not re-measured |
 
-Word accuracy meets the 85% target everywhere. Speaker accuracy does not, in the
-similar-voice condition. If you are recording test audio, use two clearly
-different voices and leave a small gap between turns.
+Word accuracy meets the 85% target everywhere. Speaker accuracy did not under
+pyannote; Sortformer, adopted 8 September, meets it on every recording in the
+primary condition. The other two conditions have not been re-measured against
+Sortformer and their figures are pyannote's.
 
 **SOAP classification** started out weak and was rebuilt. Sorting sentences by
 clinical topic alone reached 74.4% accuracy and let every greeting and scheduling
@@ -243,6 +247,11 @@ speech act rules — who is speaking, and whether the sentence reports, observes
 concludes or instructs — raised it to 97.4% with no non-clinical speech reaching
 the note, and the Assessment section went from 0 of 5 correct to 5 of 5. A
 held-out set of unseen scenarios scored 38 of 38.
+
+That 97.4% is the classifier on a perfect transcript, which is what it is meant
+to measure. Running the same four recordings end to end -- real audio, real ASR,
+real diarization -- scores **82.1%**, and the difference is what Whisper's word
+errors cost. See `docs/module_9_4_end_to_end.md`.
 
 The caveat worth knowing: I wrote both the rules and the held-out sentences, so
 this shows the classifier generalises across clinical scenarios but not
@@ -263,7 +272,7 @@ app/
   api/v1/endpoints/   HTTP endpoints, one module per resource
   core/               settings, logging, error handling, metrics
   db/                 SQLAlchemy base and session
-  ml/                 Whisper, pyannote, ClinicalBERT and BioGPT engines
+  ml/                 Whisper, Sortformer, pyannote, ClinicalBERT, BioGPT engines
   models/             database models
   schemas/            request and response models
   services/           business logic
