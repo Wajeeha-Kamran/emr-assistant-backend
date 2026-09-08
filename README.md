@@ -75,21 +75,30 @@ one from memory — it is the authoritative list.
 | `SIMULATED_EMR_URL` | Where the simulated EMR listens. Default `http://localhost:8001` |
 | `JWT_SECRET` | Key used to sign JWTs |
 | `ENCRYPTION_KEY` | Fernet key for encrypting clinical text at rest. Generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
-| `HF_TOKEN` | Hugging Face read token. Needed to download the speaker separation models — see below |
+| `HF_TOKEN` | Hugging Face read token. **Optional** — only the pyannote fallback diarizer needs it. See below |
 | `AUDIO_STORAGE_DIR` | Where uploaded recordings are written |
 
 `.env` is gitignored. Do not commit it.
 
-### The Hugging Face token, and why you will get stuck without it
+### The Hugging Face token — optional since 8 September 2026
 
-This is the step that trips people up, so it is worth reading before you start.
+**You no longer need one to run the system.** The default diarizer is NVIDIA NeMo
+Sortformer, whose checkpoint is openly downloadable: no token, no licence to
+accept. A fresh clone transcribes and diarizes with `HF_TOKEN` left empty.
 
-If `HF_TOKEN` is missing, the API still starts, you can still log in, and audio
-still uploads. Transcription then fails the moment pyannote loads. It looks like a
-broken pipeline when it is actually a missing setting.
+The token is only needed for the **pyannote fallback**, which runs when
+Sortformer fails to load — most often because the environment is not Python
+3.12. Without a token that fallback is unavailable too, and the service drops to
+the much weaker window/embedding methods. So: not required, but worth having, as
+insurance.
 
-Create a read token at <https://huggingface.co/settings/tokens>, then accept the
-licence on **all three** of these model pages while signed in:
+Before 8 September this section read "why you will get stuck without it", because
+pyannote was the primary engine and transcription did fail without a token. That
+is no longer the case.
+
+If you do want the fallback available, create a read token at
+<https://huggingface.co/settings/tokens>, then accept the licence on **all three**
+of these model pages while signed in:
 
 - `pyannote/segmentation-3.0`
 - `pyannote/speaker-diarization-3.1`
