@@ -72,23 +72,37 @@ produced by `scripts/evaluate_sortformer.py`.
 - `app/core/config.py` — `DIARIZATION_METHOD` default changed to
   `"sortformer"`. `HF_TOKEN` is now only needed by the fallback.
 
-## What still blocks it at runtime
+## Building the environment Sortformer needs
 
-NeMo does not support Python 3.14, and `.venv` is Python 3.14. Until the
-backend virtual environment is rebuilt on Python 3.12, `SortformerEngine`
-will fail to import on the first request and the service will log the failure
-and use pyannote. The integration is correct but dormant.
-
-The rebuild is the remaining step:
+NeMo does not support Python 3.14, and the original `.venv` is Python 3.14.
+On that interpreter `SortformerEngine` fails to import on the first request
+and the service logs the failure and falls back to pyannote -- silently, as
+far as the API is concerned. **Sortformer therefore requires `.venv312`.**
+`run_backend.ps1` prefers it automatically and prints a yellow warning if it
+has to fall back to `.venv`.
 
     py -3.12 -m venv .venv312
-    .\.venv312\Scripts\pip install -r requirements.txt
+    .\.venv312\Scripts\pip install -r requirements-312.txt
     .\.venv312\Scripts\pip install nemo_toolkit[asr]
     .\.venv312\Scripts\python -m pytest
+    .\.venv312\Scripts\python scripts\verify_sortformer_pipeline.py
+
+**Use `requirements-312.txt`, not `requirements.txt`.** The latter includes
+`resemblyzer`, whose `webrtcvad` dependency has no wheel and must compile. On
+a machine where Python 3.12 lives at a drive root, setuptools emits the
+malformed linker path `D:libs` and the build dies with
+`LNK1104: cannot open file 'python312.lib'`. `requirements-312.txt` omits it;
+resemblyzer served only the 66% `embedding` diarizer, which now sits fourth in
+the fallback chain, and NeMo supplies `librosa` and `soundfile` in its place.
+
+Expected result: **155 passed**, and the verify script printing
+`PASS: Sortformer produced the speaker turns`. Run the verify script rather
+than trusting the test suite -- no test asserts which diarizer ran, so all 155
+pass just as happily on the pyannote fallback.
 
 An earlier note recorded that Sortformer required Linux or WSL2. That was
 wrong. NeMo 3.0.0, `openai-whisper` 20250625 and `pyannote.audio` 4.0.7
-install and import together on Windows under Python 3.12 with `numpy` 2.5.2
+install and import together on Windows under Python 3.12 with `numpy` 2.5.3
 and `torch` 2.14.0, with no version forcing. The `numpy < 2.0` conflict
 belonged to NeMo 2.5.0 and no longer exists. `notebooks/README.md` has been
 corrected.

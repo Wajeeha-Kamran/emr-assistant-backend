@@ -27,7 +27,7 @@ Generated from a full test run on 15 August 2026: **107 passed, 0 failed.**
 Reproduce with:
 
 ```
-.\.venv\Scripts\python.exe -m pytest -q
+.\.venv312\Scripts\python.exe -m pytest -q
 ```
 
 The suite prints the table below at the end of every run. It is produced from
@@ -58,7 +58,7 @@ naming it, and if a test is added without being mapped, collection also fails.
 Run a single test case's tests with its marker, for example:
 
 ```
-.\.venv\Scripts\python.exe -m pytest -m tc06 -q
+.\.venv312\Scripts\python.exe -m pytest -m tc06 -q
 ```
 
 ---

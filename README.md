@@ -26,7 +26,9 @@ module by module log, including the parts that are still open.
 
 ## What you need
 
-- Python 3.11 or later (I developed on 3.14)
+- **Python 3.12** — required. NeMo, which provides the Sortformer diarizer,
+  does not support 3.13 or 3.14. On a newer interpreter the backend still runs
+  but silently falls back to the weaker pyannote diarizer.
 - PostgreSQL 14 or later
 - FFmpeg on your PATH — Whisper uses it to decode audio
 - About 2 GB of disk for the models, which download the first time you run the
@@ -34,11 +36,26 @@ module by module log, including the parts that are still open.
 
 ## Setting it up
 
-```bash
-python -m venv .venv
-.\.venv\Scripts\activate            # Windows
-pip install -r requirements.txt
+```powershell
+py -3.12 -m venv .venv312
+.\.venv312\Scripts\pip install -r requirements-312.txt
+.\.venv312\Scripts\pip install nemo_toolkit[asr]
 ```
+
+`requirements-312.txt` is `requirements.txt` minus `resemblyzer`, whose
+`webrtcvad` dependency has to compile and fails to link on some Windows
+Python installations. It served only a deprecated fallback diarizer.
+
+Check the environment is right before going further:
+
+```powershell
+.\.venv312\Scripts\python -m pytest                              # expect 155 passed
+.\.venv312\Scripts\python scripts\verify_sortformer_pipeline.py   # expect PASS
+```
+
+The second command matters. No test asserts which diarizer ran, so the suite
+passes either way; the verify script is what proves Sortformer actually loaded
+instead of falling back.
 
 Create the two databases:
 

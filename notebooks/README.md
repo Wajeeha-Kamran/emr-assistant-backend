@@ -48,7 +48,7 @@ NeMo 2.5.0, the version Colab's `pip` resolved to in August, required
 installed first.
 
 **Corrected 8 Sep 2026.** This is a property of NeMo 2.5.0, not of NeMo.
-NeMo 3.0.0 installs against `numpy 2.5.2` and `torch 2.14.0`, and NeMo 3.0.0,
+NeMo 3.0.0 installs against `numpy 2.5.3` and `torch 2.14.0`, and NeMo 3.0.0,
 `openai-whisper` 20250625 and `pyannote.audio` 4.0.7 import together in one
 Python **3.12** environment on Windows with no version forcing at all. The
 conflict described below is historical.

@@ -288,19 +288,19 @@ From the repository root:
 
 ```
 # human recordings, distinct voices — the primary result
-.\.venv\Scripts\python.exe -m scripts.evaluate_accuracy --audio-dir docs/evidence/human_distinct
+.\.venv312\Scripts\python.exe -m scripts.evaluate_accuracy --audio-dir docs/evidence/human_distinct
 
 # human recordings, similar voices — audio not committed; will report
 # "no recordings evaluated" on a fresh clone
-.\.venv\Scripts\python.exe -m scripts.evaluate_accuracy
+.\.venv312\Scripts\python.exe -m scripts.evaluate_accuracy
 
 # synthetic control
 powershell -ExecutionPolicy Bypass -File scripts\synthesize_scripts.ps1
-.\.venv\Scripts\python.exe -m scripts.build_synthetic_audio
-.\.venv\Scripts\python.exe -m scripts.evaluate_accuracy --audio-dir docs/evidence/synthetic
+.\.venv312\Scripts\python.exe -m scripts.build_synthetic_audio
+.\.venv312\Scripts\python.exe -m scripts.evaluate_accuracy --audio-dir docs/evidence/synthetic
 
 # evidence that the pause heuristic cannot work at any threshold
-.\.venv\Scripts\python.exe -m scripts.diagnose_gaps
+.\.venv312\Scripts\python.exe -m scripts.diagnose_gaps
 ```
 
 Requires `HF_TOKEN` in `.env`, with the licences accepted for all three gated

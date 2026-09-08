@@ -147,10 +147,10 @@ This outcome was anticipated in the project's own requirements. SRS 2.1.4 Constr
 
 ```
 # Stop the retention scheduler and simulated EMR service first.
-.\.venv\Scripts\uvicorn.exe app.main:app
+.\.venv312\Scripts\uvicorn.exe app.main:app
 
 # In a second terminal:
-.\.venv\Scripts\python.exe -m scripts.load_test docs\evidence\load_clip.wav
+.\.venv312\Scripts\python.exe -m scripts.load_test docs\evidence\load_clip.wav
 ```
 
 The script refuses to run on silent audio, warms the models before timing, prints the window count for the clip supplied, and labels every extrapolated figure as an estimate rather than a measurement.

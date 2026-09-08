@@ -128,8 +128,8 @@ own test data.
 ## Reproducing
 
 ```
-.\.venv\Scripts\python.exe -m scripts.evaluate_soap              # the four reference scripts
-.\.venv\Scripts\python.exe -m scripts.evaluate_soap --heldout    # unseen clinical scenarios
+.\.venv312\Scripts\python.exe -m scripts.evaluate_soap              # the four reference scripts
+.\.venv312\Scripts\python.exe -m scripts.evaluate_soap --heldout    # unseen clinical scenarios
 ```
 
 Roughly one minute each. Loads ClinicalBERT; no ASR, no database, no server.

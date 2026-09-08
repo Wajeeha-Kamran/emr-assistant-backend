@@ -114,9 +114,9 @@ something, rather than only doing what it is told.
 Three commands, about a minute each:
 
 ```
-.\.venv\Scripts\python.exe -m pytest -q
-.\.venv\Scripts\python.exe -m scripts.evaluate_soap
-.\.venv\Scripts\python.exe -m scripts.evaluate_soap --heldout
+.\.venv312\Scripts\python.exe -m pytest -q
+.\.venv312\Scripts\python.exe -m scripts.evaluate_soap
+.\.venv312\Scripts\python.exe -m scripts.evaluate_soap --heldout
 ```
 
 The test run prints a traceability table mapping results to TC-01…TC-10 from the

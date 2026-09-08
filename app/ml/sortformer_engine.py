@@ -28,7 +28,7 @@ REQUIREMENTS
     pip install nemo_toolkit[asr]        (3.0.0 verified)
 
 NeMo 3.0.0, openai-whisper 20250625 and pyannote.audio 4.0.7 install and
-import together in one Python 3.12 environment on Windows with numpy 2.5.2
+import together in one Python 3.12 environment on Windows with numpy 2.5.3
 and torch 2.14.0 — verified 8 Sep 2026. The earlier note that this needed
 Linux or WSL2 was a consequence of Python 3.14 and of NeMo 2.5.0's numpy 1.x
 pin, and no longer applies.

@@ -16,13 +16,13 @@ Two services must be running, in two separate terminals, from the repository roo
 **Terminal 1 — the API**
 
 ```
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
+.\.venv312\Scripts\python.exe -m uvicorn app.main:app --port 8000
 ```
 
 **Terminal 2 — the simulated EMR**
 
 ```
-.\.venv\Scripts\python.exe -m uvicorn simulated_emr_service.main:app --port 8001
+.\.venv312\Scripts\python.exe -m uvicorn simulated_emr_service.main:app --port 8001
 ```
 
 The second one matters: signing a note triggers a background sync to the simulated
