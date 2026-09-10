@@ -188,7 +188,19 @@ def _run_values(run: List[str]) -> List[str]:
 
 def numeric_facts(text: str) -> set:
     """Normalised numbers and units. Comparable across word and digit forms."""
-    tokens = re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", (text or "").lower())
+    text = (text or "").lower()
+
+    # "50mg" is one token to a word-level tokeniser, and it matches neither the
+    # digit pattern nor the unit list, so it was silently discarded -- the dose
+    # was neither credited nor checked. A model writing "500mg" instead of
+    # "500 mg" would have walked past the values-not-in-source check entirely.
+    #
+    # Not hypothetical: Mistral 7B writes "sumatriptan 50mg" by default, so the
+    # one check in this file that exists for patient safety was blind to the
+    # exact formatting the model under test happens to prefer.
+    text = re.sub(r"(\d)\s*([a-z])", r"\1 \2", text)
+
+    tokens = re.findall(r"[a-z0-9]+(?:\.[0-9]+)?", text)
     facts, run = set(), []
     for tok in tokens:
         if tok in _NUMWORDS or (run and tok in ("and", "point")):
