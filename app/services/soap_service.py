@@ -7,6 +7,16 @@ logger = logging.getLogger(__name__)
 
 FALLBACK_TEXT = "Not documented in dialogue."
 
+# The lead-in each section's text carries. Kept here rather than inline so that
+# SOAPService.select_sections and any alternative renderer (see
+# app/ml/soap_engine.py) agree on them without duplicating string literals.
+SECTION_PREFIXES = {
+    "subjective": "Patient reports: ",
+    "objective": "Clinician noted: ",
+    "assessment": "Clinical impression: ",
+    "plan": "Plan: ",
+}
+
 # Split on sentence-ending punctuation followed by whitespace. The negative
 # lookbehind/lookahead on digits keeps "38.2" and "one 140.90" intact, which
 # matters because ASR writes measurements as digits.
@@ -246,23 +256,28 @@ def _is_documentable(sentence: str) -> bool:
 
 class SOAPService:
     @staticmethod
-    def generate_draft(
+    def select_sections(
         segments: List[Dict[str, Any]]
-    ) -> Dict[str, str]:
+    ) -> Dict[str, List[str]]:
         """
-        Generates a structured SOAP note from diarized transcript segments
-        using a purely extractive pipeline.
+        Choose which sentences belong in which SOAP section.
+
+        This is the measured component: 97.4% clinical accuracy with a 0.0%
+        noise rate on the reference consultations, 100% on the held-out set
+        (docs/module_3_soap_classification.md). It returns the SELECTED
+        SENTENCES rather than finished text, so that the choice of what goes
+        where stays separate from how it is worded.
 
         Stage 1: PATIENT segments go directly to SUBJECTIVE.
         Stage 2: DOCTOR segments are classified into OBJECTIVE, ASSESSMENT,
                  or PLAN via ClinicalBERT zero-shot similarity.
 
-        Returns a dictionary containing:
+        Returns the sentences chosen for each section:
         {
-            "subjective": str,
-            "objective": str,
-            "assessment": str,
-            "plan": str
+            "subjective": List[str],
+            "objective": List[str],
+            "assessment": List[str],
+            "plan": List[str]
         }
         """
         # NOTE: BioGPT (app/ml/biogpt_engine.py) is intentionally NOT called here.
@@ -338,44 +353,65 @@ class SOAPService:
             classified_docs, [d["text"] for d in doctor_segments]
         )
 
-        def _join_segments(texts: List[str]) -> str:
-            if not texts:
-                return ""
+        return {
+            "subjective": list(patient_texts),
+            "objective": list(classified_docs.get("objective") or []),
+            "assessment": list(classified_docs.get("assessment") or []),
+            "plan": list(classified_docs.get("plan") or []),
+        }
+
+    @staticmethod
+    def render_extractive(sections: Dict[str, List[str]]) -> Dict[str, str]:
+        """
+        Join selected sentences into section text, verbatim.
+
+        This is the renderer that guarantees the property the project has
+        relied on since BioGPT was removed: every word in the note appears in
+        the transcript, so nothing can be invented. Measured noise rate 0.0%
+        and, by construction, a novel-content rate of 0.0%.
+
+        It is separated from selection so an alternative renderer -- an
+        instruction-tuned LLM asked to rewrite these same sentences as prose --
+        can be measured against it on identical input. See
+        app/ml/soap_engine.py.
+        """
+        def _join(texts: List[str]) -> str:
             cleaned = []
-            for t in texts:
+            for t in texts or []:
                 t = t.strip()
                 if not t:
                     continue
-                # Add terminal punctuation if missing
-                if not t[-1] in {'.', '!', '?'}:
+                if t[-1] not in {'.', '!', '?'}:
                     t += "."
                 cleaned.append(t)
             return " ".join(cleaned)
 
         result = {}
-
-        # Subjective (Patient only)
-        if patient_texts:
-            result["subjective"] = "Patient reports: " + _join_segments(patient_texts)
-        else:
-            result["subjective"] = FALLBACK_TEXT
-
-        # Objective
-        if classified_docs.get("objective"):
-            result["objective"] = "Clinician noted: " + _join_segments(classified_docs["objective"])
-        else:
-            result["objective"] = FALLBACK_TEXT
-
-        # Assessment
-        if classified_docs.get("assessment"):
-            result["assessment"] = "Clinical impression: " + _join_segments(classified_docs["assessment"])
-        else:
-            result["assessment"] = FALLBACK_TEXT
-
-        # Plan
-        if classified_docs.get("plan"):
-            result["plan"] = "Plan: " + _join_segments(classified_docs["plan"])
-        else:
-            result["plan"] = FALLBACK_TEXT
-
+        for name, prefix in SECTION_PREFIXES.items():
+            picked = sections.get(name) or []
+            result[name] = (prefix + _join(picked)) if picked else FALLBACK_TEXT
         return result
+
+    @staticmethod
+    def generate_draft(segments: List[Dict[str, Any]]) -> Dict[str, str]:
+        """
+        Select the content and render it with the configured SOAP engine.
+
+        Defaults to the extractive renderer, so this returns exactly what it
+        returned before the engine seam was introduced.
+        """
+        sections = SOAPService.select_sections(segments)
+
+        from app.core.config import settings
+        if getattr(settings, "SOAP_ENGINE", "extractive") != "extractive":
+            try:
+                from app.ml.soap_engine import get_soap_engine
+                return get_soap_engine().render(sections)
+            except Exception as e:
+                logger.error(
+                    "SOAP engine '%s' failed (%s: %s); falling back to the "
+                    "extractive renderer.",
+                    settings.SOAP_ENGINE, type(e).__name__, e,
+                )
+
+        return SOAPService.render_extractive(sections)

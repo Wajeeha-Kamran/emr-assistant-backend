@@ -45,6 +45,19 @@ class Settings(BaseSettings):
     # to the caller. It is NOT a cap on how long successful processing may take 
     # (the Efficiency NFR allows 15s-25s for SOAP generation under load). 
     # Timeouts are runaway guards, sized above the performance budget.
+    # --- SOAP rendering engine ---
+    # "extractive" = join the selected sentences verbatim (default). Novel
+    #                content rate 0.0% by construction: nothing can be invented.
+    # "llm"        = an instruction-tuned model rewrites the SAME selected
+    #                sentences as prose. It never sees the raw transcript.
+    #                Requires LLM_MODEL_ID. Measure with
+    #                scripts/evaluate_groundedness.py BEFORE adopting one --
+    #                BioGPT already failed this project by ignoring its
+    #                instruction and completing text instead.
+    SOAP_ENGINE: str = "extractive"
+    LLM_MODEL_ID: str = ""
+    LLM_MAX_NEW_TOKENS: int = 220
+
     NLP_TIMEOUT_SECONDS: int = 30
     
     # ASR is slower than real-time on CPU, and supports 30-minute recordings. 
