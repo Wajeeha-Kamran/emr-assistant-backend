@@ -32,7 +32,7 @@ import re
 import os
 import sys
 import time
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -113,9 +113,100 @@ def sections_containing(needle: List[str],
 
 SECTIONS = ("objective", "assessment", "plan", "subjective")
 
+# ------------------------------------------------- placement under paraphrase
+#
+# WHY A SECOND MEASURE
+# sections_containing() asks whether the REFERENCE WORDING survives in the
+# right section. Extraction guarantees that by construction; a model asked to
+# rewrite deliberately breaks it. Scoring the two against each other on that
+# measure is rigged before the comparison starts -- MedGemma 4B scored 51.3%
+# on it while producing objective and assessment sections that were, on
+# reading, correct.
+#
+# So placement is also measured on CONTENT words alone: the clinical nouns and
+# verbs, with the function words and numbers that paraphrase legitimately
+# rewrites removed. "Your blood pressure is one forty over ninety, which is
+# elevated" and "The patient's blood pressure is 140/90 mmHg, which is
+# elevated" share blood/pressure/elevated and differ in almost everything else.
+#
+# Both numbers are reported. The lexical one says how much of the doctor's own
+# wording survived, which is a real property and the one extraction is good at.
+# The content one says whether the clinical fact reached the right section,
+# which is the question actually being asked.
+
+_STOP = {
+    "a", "an", "the", "and", "or", "but", "if", "then", "than", "that", "this",
+    "these", "those", "is", "are", "was", "were", "be", "been", "being", "am",
+    "do", "does", "did", "have", "has", "had", "having", "of", "to", "in", "on",
+    "at", "by", "for", "with", "from", "as", "into", "about", "over", "after",
+    "before", "up", "down", "out", "off", "it", "its", "he", "she", "they",
+    "them", "his", "her", "their", "you", "your", "i", "my", "me", "we", "us",
+    "there", "here", "which", "who", "whom", "what", "when", "where", "how",
+    "so", "very", "also", "just", "any", "some", "all", "both", "will",
+    "would", "should", "could", "can", "may", "might", "must", "shall",
+    "patient", "reports", "clinician", "noted", "clinical", "impression",
+    "plan", "going", "let", "am",
+}
+
+
+def _content(text_words: List[str]) -> List[str]:
+    from scripts.evaluate_groundedness import stem
+    return [stem(w) for w in strip_numbers(text_words)
+            if w not in _STOP and len(w) > 2]
+
+
+def place_sentence(needle: List[str],
+                   section_words: Dict[str, List[str]]) -> Tuple[str, float]:
+    """
+    Which section did this sentence's clinical content actually land in?
+
+    Returns (section, coverage). Section is "DROPPED" when nothing reaches the
+    threshold. The winner is the best-covered section rather than every section
+    above it, so a sentence cannot be counted correct merely for appearing
+    twice.
+    """
+    n = _content(needle)
+    if not n:
+        return "DROPPED", 0.0
+    scored = []
+    for sec in SECTIONS:
+        h = _content(section_words.get(sec, []))
+        matcher = difflib.SequenceMatcher(None, h, n, autojunk=False)
+        matched = sum(b.size for b in matcher.get_matching_blocks())
+        scored.append((matched / len(n), sec))
+    scored.sort(reverse=True)
+    best, sec = scored[0]
+    return (sec, round(best, 2)) if best >= COVERAGE_THRESHOLD else ("DROPPED", round(best, 2))
+
+
 AUDIO_DIR = os.path.join(EVIDENCE_DIR, "human_distinct")
 OUT_CSV = os.path.join(EVIDENCE_DIR, "benchmarks", "soap_e2e_detail.csv")
 OUT_JSON = os.path.join(EVIDENCE_DIR, "benchmarks", "soap_e2e_drafts.json")
+
+
+def placement(needle: List[str],
+              section_words: Dict[str, List[str]]) -> Dict[str, object]:
+    """
+    Both readings of "did this sentence reach the right section".
+
+    LEXICAL keeps the reference wording, numbers and function words included.
+    It is the stricter test and the one extraction is built to pass.
+
+    CONTENT keeps only clinical words. It survives paraphrase, which is the
+    whole point of using a model, but it goes thin on short sentences:
+    "Temperature is thirty eight point two" reduces to the single word
+    "temperature", which also appears in the patient's own account, so it
+    cannot be placed. Measured on the extractive control -- lexical 38/39,
+    content 37/39, and the sentence each one misses is a different sentence.
+
+    Neither is the right answer alone, so both are reported and so is their
+    union. The union is generous, but it is generous to extraction and to
+    generation in exactly the same way, which is what keeps the comparison
+    fair. All three columns are printed so nothing hides behind the choice.
+    """
+    lex = sections_containing(needle, section_words)
+    content, coverage = place_sentence(needle, section_words)
+    return {"lexical": lex, "content": content, "coverage": coverage}
 
 
 def pipeline_turns(audio_path: str, asr) -> List[Dict[str, str]]:

@@ -113,14 +113,46 @@ def _fmt(v) -> str:
     return str(int(v)) if float(v).is_integer() else str(v)
 
 
+def _merge_pairs(run: List[str]) -> List[int]:
+    """
+    Group a run of number words the way a speaker means them.
+
+        one thirty two  ->  [1, 32]
+        one forty       ->  [1, 40]
+        eighty four     ->  [84]
+        fifty eight     ->  [58]
+
+    A tens word followed by a ones word is one number, not two. Without this,
+    "one thirty two" concatenates as 1|30|2 = "1302" and never produces 132 --
+    which is how a correctly transcribed blood pressure of 132/84 came to be
+    reported as an invented number by the first version of this file.
+    """
+    vals, i = [], 0
+    while i < len(run):
+        w = run[i]
+        if (w in _TENS and i + 1 < len(run)
+                and run[i + 1] in _ONES and _ONES[run[i + 1]] < 10):
+            vals.append(_TENS[w] + _ONES[run[i + 1]])
+            i += 2
+        elif w in _ONES:
+            vals.append(_ONES[w]); i += 1
+        elif w in _TENS:
+            vals.append(_TENS[w]); i += 1
+        elif w in _SCALES:
+            vals.append(_SCALES[w]); i += 1
+        else:
+            i += 1
+    return vals
+
+
 def _run_values(run: List[str]) -> List[str]:
     """
     Every value a run of number words could plausibly mean.
 
     Deliberately generous. "one forty over ninety" is spoken blood pressure;
     the textbook composer reads it as 41, a reader hears 140. Rather than
-    guess, the run yields the composed value, each word's own value, and the
-    digit concatenation -- so "140" is accepted as sourced.
+    guess, the run yields the spoken reading, the composed value, and each
+    word's own value -- so 140 is accepted as sourced.
 
     The bias is toward NOT raising an alarm. A metric that cries wolf on
     correct output gets ignored, which costs more than it saves. Every flagged
@@ -135,7 +167,10 @@ def _run_values(run: List[str]) -> List[str]:
         right = "".join(_fmt(_ONES.get(w, _TENS.get(w, 0))) for w in run[i + 1:])
         return [f"{left[0]}.{right}"] if left and right else left
 
-    out, total, current = [], 0, 0
+    merged = _merge_pairs(run)
+    out = ["".join(_fmt(v) for v in merged)] if merged else []
+
+    total = current = 0
     for w in run:
         if w in _ONES:
             current += _ONES[w]
@@ -147,11 +182,7 @@ def _run_values(run: List[str]) -> List[str]:
                 total += current
                 current = 0
     out.append(_fmt(total + current))
-
-    singles = [_ONES.get(w, _TENS.get(w, _SCALES.get(w, 0))) for w in run]
-    out += [_fmt(v) for v in singles]
-    if len(run) > 1:
-        out.append("".join(_fmt(v) for v in singles))
+    out += [_fmt(v) for v in merged]
     return out
 
 
@@ -204,21 +235,98 @@ def content_words(text: str) -> List[str]:
 
 
 
-def score_section(source_sentences: List[str], note_text: str
-                  ) -> Tuple[int, int, int, int, List[str], List[str]]:
-    """(novel, note_total, omitted, src_total, novel_words, bad_numerics)"""
+def score_section(source_sentences: List[str], note_text: str) -> Dict:
+    """
+    One section's faithfulness.
+
+    Invented values and added units are reported separately. Writing "140/90
+    mmHg" where the source said "one forty over ninety" adds a unit that is
+    correct and helpful; writing 500 mg where the source said fifty is a
+    different kind of event entirely. Averaging them together would let a
+    model hide a wrong dose behind a tidy unit, and would flag a careful model
+    for being explicit.
+    """
     src = content_words(" ".join(source_sentences))
     note = content_words(note_text)
     src_set, note_set = set(src), set(note)
 
-    novel_words = sorted(note_set - src_set)
-    omitted_words = sorted(src_set - note_set)
-
     src_nums = numeric_facts(" ".join(source_sentences))
-    bad_numerics = sorted(numeric_facts(note_text) - src_nums)
+    unsourced = numeric_facts(note_text) - src_nums
+    units = set(UNIT_SYNONYMS.values())
 
-    return (len(novel_words), len(note_set), len(omitted_words), len(src_set),
-            novel_words, bad_numerics)
+    return {
+        "novel": len(note_set - src_set),
+        "note_total": len(note_set),
+        "omitted": len(src_set - note_set),
+        "src_total": len(src_set),
+        "novel_words": sorted(note_set - src_set),
+        "bad_values": sorted(n for n in unsourced if n not in units),
+        "added_units": sorted(n for n in unsourced if n in units),
+    }
+
+
+# ------------------------------------------------------------ polarity
+#
+# WHAT THIS DOES NOT DO
+# It does not detect inversion. It cannot: the check is lexical, and an
+# inversion is a change of meaning that leaves the words intact.
+#
+# Measured case, MedGemma 4B on script 1. Source: "Not this bad. I get normal
+# headaches but nothing like this." Note: "The headaches are not as severe as
+# they usually are." The patient is saying this headache is WORSE than any
+# they have had -- a red flag in headache assessment -- and the note says the
+# opposite. Every content word is legitimately sourced, so novel content
+# scored it clean. Both texts contain a negation cue, so even a
+# cue-mismatch heuristic would miss it.
+#
+# Detecting that properly needs entailment, which means another model, which
+# would itself need validating before its verdicts could be trusted.
+#
+# So this narrows the reading instead. It lists the note sentences where an
+# inversion is even possible -- those carrying a negation or comparison -- next
+# to the source they were drawn from. On four consultations that is a short
+# list, and a short list a person actually reads beats a number nobody
+# believes.
+
+NEGATION_CUES = {
+    "no", "not", "never", "none", "nothing", "neither", "nor", "without",
+    "denies", "denied", "deny", "absent", "negative", "unable", "cannot",
+    "cant", "dont", "doesnt", "didnt", "hasnt", "havent", "isnt", "wasnt",
+    "arent", "werent", "wont", "nil", "free", "ruled", "excludes", "excluded",
+}
+COMPARISON_CUES = {
+    "worse", "worst", "better", "best", "more", "less", "least", "most",
+    "than", "as", "usual", "usually", "normal", "normally", "increased",
+    "decreased", "higher", "lower", "improved", "improving", "worsening",
+    "unchanged", "same", "similar", "greater", "fewer", "reduced", "raised",
+}
+
+_SENT_SPLIT = re.compile(r"(?<![0-9])[.!?]+(?![0-9])\s+")
+
+
+def polarity_review(source_sentences: List[str], note_text: str) -> List[Dict]:
+    """Note sentences a person must check for a flipped meaning."""
+    out = []
+    for sent in _SENT_SPLIT.split(note_text or ""):
+        sent = sent.strip()
+        if not sent:
+            continue
+        toks = set(WORD_RE.findall(sent.lower()))
+        cues = sorted((toks & NEGATION_CUES) | (toks & COMPARISON_CUES))
+        if not cues:
+            continue
+        words_here = set(content_words(sent))
+        best, best_overlap = "", 0.0
+        for src in source_sentences:
+            sw = set(content_words(src))
+            if not sw:
+                continue
+            overlap = len(words_here & sw) / len(sw)
+            if overlap > best_overlap:
+                best, best_overlap = src, overlap
+        out.append({"note": sent, "cues": cues, "source": best,
+                    "overlap": round(best_overlap, 2)})
+    return out
 
 
 def load_notes(path: str) -> Dict[str, Dict[str, str]]:
@@ -305,25 +413,25 @@ def selftest() -> int:
     for name, corrupt, expect in CORRUPTIONS:
         note = dict(base)
         note["plan"] = corrupt(base["plan"])
-        novel, note_n, om, src_n, novel_w, bad = score_section(
-            src.get("plan") or [], note["plan"]
-        )
+        r = score_section(src.get("plan") or [], note["plan"])
         got = {
-            "novel": novel > 0,
-            "numeric": len(bad) > 0,
-            "omission": om > 0,
+            "novel": r["novel"] > 0,
+            "numeric": len(r["bad_values"]) > 0,
+            "omission": r["omitted"] > 0,
         }
         ok = all(got[k] == v for k, v in expect.items())
         failures += 0 if ok else 1
         print(f"  {'PASS' if ok else 'FAIL'}  {name}")
-        print(f"        novel={novel} ({novel_w[:6]})  bad_numerics={bad}  omitted={om}")
+        print(f"        novel={r['novel']} ({r['novel_words'][:6]})  "
+              f"bad_values={r['bad_values']}  units={r['added_units']}  "
+              f"omitted={r['omitted']}")
         if not ok:
             print(f"        expected {expect}, measured "
                   f"{ {k: got[k] for k in expect} }")
 
     # And the faithful note must stay clean, or the metric cries wolf.
-    novel, _, om, _, _, bad = score_section(src.get("plan") or [], base["plan"])
-    ok = novel == 0 and om == 0 and not bad
+    r = score_section(src.get("plan") or [], base["plan"])
+    ok = r["novel"] == 0 and r["omitted"] == 0 and not r["bad_values"]
     failures += 0 if ok else 1
     print(f"  {'PASS' if ok else 'FAIL'}  unmodified extractive text stays clean")
 
@@ -357,6 +465,8 @@ def main() -> int:
 
     tot_novel = tot_note = tot_om = tot_src = 0
     all_bad_nums: List[str] = []
+    all_units: List[str] = []
+    polarity: List = []
     rows = []
 
     for script in sorted(sections_by_script, key=lambda x: int(x)):
@@ -364,17 +474,22 @@ def main() -> int:
         note = notes.get(script) or notes.get(str(script)) or {}
         s_novel = s_note = s_om = s_src = 0
         s_bad: List[str] = []
+        s_units: List[str] = []
 
         for name in SECTIONS:
-            novel, note_n, om, src_n, novel_w, bad = score_section(
-                sec.get(name) or [], note.get(name, "")
-            )
-            s_novel += novel; s_note += note_n; s_om += om; s_src += src_n
-            s_bad += bad
-            if bad:
-                print(f"  [{script}/{name}] NUMERIC NOT IN SOURCE: {bad}")
-            if novel_w:
-                print(f"  [{script}/{name}] novel: {novel_w[:12]}")
+            r = score_section(sec.get(name) or [], note.get(name, ""))
+            s_novel += r["novel"]; s_note += r["note_total"]
+            s_om += r["omitted"]; s_src += r["src_total"]
+            s_bad += r["bad_values"]; s_units += r["added_units"]
+            if r["bad_values"]:
+                print(f"  [{script}/{name}] VALUE NOT IN SOURCE: {r['bad_values']}")
+            if r["added_units"]:
+                print(f"  [{script}/{name}] unit added (usually benign): "
+                      f"{r['added_units']}")
+            if r["novel_words"]:
+                print(f"  [{script}/{name}] novel: {r['novel_words'][:12]}")
+            for item in polarity_review(sec.get(name) or [], note.get(name, "")):
+                polarity.append((script, name, item))
 
         nr = (s_novel / s_note * 100) if s_note else 0.0
         orr = (s_om / s_src * 100) if s_src else 0.0
@@ -382,10 +497,10 @@ def main() -> int:
               f"bad numerics {len(s_bad)}")
         rows.append({"label": label, "script": script,
                      "novel_rate": round(nr, 1), "omission_rate": round(orr, 1),
-                     "bad_numerics": len(s_bad)})
+                     "bad_values": len(s_bad), "added_units": len(s_units)})
         tot_novel += s_novel; tot_note += s_note
         tot_om += s_om; tot_src += s_src
-        all_bad_nums += s_bad
+        all_bad_nums += s_bad; all_units += s_units
 
     nr = (tot_novel / tot_note * 100) if tot_note else 0.0
     orr = (tot_om / tot_src * 100) if tot_src else 0.0
@@ -394,10 +509,21 @@ def main() -> int:
     print(f"  label                {label}")
     print(f"  novel content rate   {tot_novel}/{tot_note} = {nr:.1f}%")
     print(f"  omission rate        {tot_om}/{tot_src} = {orr:.1f}%")
-    print(f"  numerics not in source  {len(all_bad_nums)}"
+    print(f"  values not in source {len(all_bad_nums)}"
           f"{'  <-- PATIENT SAFETY DEFECT' if all_bad_nums else ''}")
     if all_bad_nums:
         print(f"    {sorted(set(all_bad_nums))}")
+    print(f"  units added          {len(all_units)}  "
+          f"(benign if the unit is correct: {sorted(set(all_units))})")
+
+    print(f"\n  POLARITY REVIEW -- {len(polarity)} sentence(s) carry a negation")
+    print("  or comparison and must be read. This is a reading list, not a")
+    print("  detector: an inversion leaves every word in place, so no lexical")
+    print("  metric above can see one.")
+    for script, name, item in polarity:
+        print(f"\n    [{script}/{name}] cues={item['cues']}")
+        print(f"      note:   {item['note'][:110]}")
+        print(f"      source: {item['source'][:110]}  (overlap {item['overlap']})")
 
     print("\nThe extractive control scores 0.0% novel and 0 bad numerics by")
     print("construction. Any generative model is being asked what its fluency")
