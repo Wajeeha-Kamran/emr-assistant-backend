@@ -325,7 +325,23 @@ def polarity_review(source_sentences: List[str], note_text: str) -> List[Dict]:
             if overlap > best_overlap:
                 best, best_overlap = src, overlap
         out.append({"note": sent, "cues": cues, "source": best,
-                    "overlap": round(best_overlap, 2)})
+                    "overlap": round(best_overlap, 2),
+                    "unsourced": best_overlap == 0.0})
+
+    # Weakest match first. A sentence with NO matching source is not a polarity
+    # question at all, it is a fabrication, and it is the one to read first.
+    #
+    # Measured, MedGemma 4B on script 2: "The patient denies any other
+    # symptoms." -- overlap 0.0, nothing in the consultation resembles it. A
+    # pertinent negative the patient never gave. Novel content counted its
+    # words but could not say they were invented rather than rephrased; the
+    # empty source column says it at a glance.
+    #
+    # The source shown is the best lexical overlap, NOT provenance. On script 2
+    # it pairs "if the patient still cannot bear weight" with "You can bear
+    # weight, just about" when the real origin is a different sentence. Read it
+    # as "closest thing in the transcript", not "where this came from".
+    out.sort(key=lambda d: d["overlap"])
     return out
 
 
