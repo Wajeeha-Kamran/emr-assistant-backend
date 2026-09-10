@@ -1,0 +1,450 @@
+{
+  "note": "Selections frozen by scripts/export_llm_handoff.py. Every model in notebooks/07 is given exactly these sentences.",
+  "selections": {
+    "1": {
+      "subjective": [
+        "I've been having really bad headaches for about four days now.",
+        "It's mostly on the right side, behind my eye.",
+        "It throbs.",
+        "Bright light makes it much worse.",
+        "A bit nauseous yesterday morning, but I haven't actually been sick.",
+        "Sometimes there are little zigzag lines before it starts.",
+        "Not this bad.",
+        "I get normal headaches but nothing like this.",
+        "Just paracetamol when it gets bad.",
+        "It doesn't help much."
+      ],
+      "objective": [
+        "Your blood pressure is one forty over ninety, which is elevated.",
+        "Pupils are equal and reactive.",
+        "No neck stiffness."
+      ],
+      "assessment": [
+        "This looks like migraine with aura, and your blood pressure is higher than I would like."
+      ],
+      "plan": [
+        "I am going to prescribe sumatriptan fifty milligrams for the attacks.",
+        "Keep a headache diary for two weeks.",
+        "Come back in two weeks so we can recheck your blood pressure.",
+        "If the pain becomes suddenly severe, or you develop weakness or confusion, go to the emergency department immediately."
+      ]
+    },
+    "2": {
+      "subjective": [
+        "I twisted my ankle playing football yesterday evening.",
+        "The right one.",
+        "Barely.",
+        "I limped off the pitch and it's been swollen since.",
+        "No, nothing like that.",
+        "Just ice last night, and I kept it up on a cushion.",
+        "I sprained it about two years ago, the same side."
+      ],
+      "objective": [
+        "There is swelling over the lateral malleolus and tenderness on the outer side.",
+        "No bony tenderness at the posterior edge.",
+        "Range of motion is reduced by pain."
+      ],
+      "assessment": [
+        "This is a lateral ankle sprain, grade two.",
+        "I do not think it is fractured, and by the Ottawa rules you do not need an X-ray."
+      ],
+      "plan": [
+        "You can bear weight, just about.",
+        "Rest, ice, compression and elevation for the next three days.",
+        "Take ibuprofen four hundred milligrams three times daily with food.",
+        "Start gentle movement after day three.",
+        "If you still cannot bear weight in a week, come back and we will arrange imaging.",
+        "Realistically four to six weeks, and only after you can hop on it without pain."
+      ]
+    },
+    "3": {
+      "subjective": [
+        "My throat has been really sore since Saturday, and it hurts to swallow.",
+        "I felt hot last night.",
+        "I didn't take my temperature.",
+        "No cough at all, actually.",
+        "Yeah, under my jaw feels tender.",
+        "My daughter had a sore throat last week.",
+        "Mm, right.",
+        "Yeah, okay."
+      ],
+      "objective": [
+        "Temperature is thirty eight point two.",
+        "The tonsils are enlarged with white exudate on both sides.",
+        "There is tender cervical lymphadenopathy.",
+        "No cough reported."
+      ],
+      "assessment": [
+        "That gives you a Centor score of four, which makes bacterial infection likely rather than viral."
+      ],
+      "plan": [
+        "I will start you on phenoxymethylpenicillin, two hundred and fifty milligrams four times a day for ten days.",
+        "Finish the whole course even when you feel better.",
+        "Take paracetamol for the pain and drink plenty of fluids.",
+        "If you develop difficulty breathing, or you cannot swallow your own saliva, that is an emergency and you should be seen straight away."
+      ]
+    },
+    "4": {
+      "subjective": [
+        "That's right.",
+        "It's been about three months since the last one.",
+        "Honestly, mixed.",
+        "I've been taking the metformin every day, but my sugars are still higher than I'd like in the mornings.",
+        "I've been checking most days.",
+        "Usually around eight or nine before breakfast.",
+        "In the evenings it's better, maybe six or seven.",
+        "I've been trying to walk more, about twenty minutes most days, but work has been busy and I've missed some days.",
+        "My weight is about the same as last time.",
+        "No, nothing like that.",
+        "A bit of tingling in my toes at night sometimes.",
+        "Not that I've noticed.",
+        "Alright."
+      ],
+      "objective": [
+        "Your blood pressure today is one thirty two over eighty four.",
+        "Weight is unchanged at eighty six kilograms.",
+        "Your HbA1c has come back at fifty eight millimoles per mole, which is slightly above target.",
+        "Foot examination shows intact pulses and normal sensation to monofilament testing on both feet, so the tingling is not showing up as measurable nerve damage yet."
+      ],
+      "assessment": [
+        "Overall this is type two diabetes with suboptimal glycaemic control, and some early neuropathic symptoms that are not yet confirmed on examination."
+      ],
+      "plan": [
+        "I am going to increase your metformin to one gram twice daily.",
+        "Please continue monitoring your morning readings and bring the record next time.",
+        "I will refer you for retinal screening, which is due, and I would like repeat bloods in three months.",
+        "If the tingling in your feet gets worse or spreads, let me know sooner rather than waiting.",
+        "Focus on the morning readings first.",
+        "I will book you in with the diabetes nurse to go through evening meals, since that is what usually drives the fasting numbers."
+      ]
+    }
+  },
+  "extractive": {
+    "1": {
+      "subjective": "Patient reports: I've been having really bad headaches for about four days now. It's mostly on the right side, behind my eye. It throbs. Bright light makes it much worse. A bit nauseous yesterday morning, but I haven't actually been sick. Sometimes there are little zigzag lines before it starts. Not this bad. I get normal headaches but nothing like this. Just paracetamol when it gets bad. It doesn't help much.",
+      "objective": "Clinician noted: Your blood pressure is one forty over ninety, which is elevated. Pupils are equal and reactive. No neck stiffness.",
+      "assessment": "Clinical impression: This looks like migraine with aura, and your blood pressure is higher than I would like.",
+      "plan": "Plan: I am going to prescribe sumatriptan fifty milligrams for the attacks. Keep a headache diary for two weeks. Come back in two weeks so we can recheck your blood pressure. If the pain becomes suddenly severe, or you develop weakness or confusion, go to the emergency department immediately."
+    },
+    "2": {
+      "subjective": "Patient reports: I twisted my ankle playing football yesterday evening. The right one. Barely. I limped off the pitch and it's been swollen since. No, nothing like that. Just ice last night, and I kept it up on a cushion. I sprained it about two years ago, the same side.",
+      "objective": "Clinician noted: There is swelling over the lateral malleolus and tenderness on the outer side. No bony tenderness at the posterior edge. Range of motion is reduced by pain.",
+      "assessment": "Clinical impression: This is a lateral ankle sprain, grade two. I do not think it is fractured, and by the Ottawa rules you do not need an X-ray.",
+      "plan": "Plan: You can bear weight, just about. Rest, ice, compression and elevation for the next three days. Take ibuprofen four hundred milligrams three times daily with food. Start gentle movement after day three. If you still cannot bear weight in a week, come back and we will arrange imaging. Realistically four to six weeks, and only after you can hop on it without pain."
+    },
+    "3": {
+      "subjective": "Patient reports: My throat has been really sore since Saturday, and it hurts to swallow. I felt hot last night. I didn't take my temperature. No cough at all, actually. Yeah, under my jaw feels tender. My daughter had a sore throat last week. Mm, right. Yeah, okay.",
+      "objective": "Clinician noted: Temperature is thirty eight point two. The tonsils are enlarged with white exudate on both sides. There is tender cervical lymphadenopathy. No cough reported.",
+      "assessment": "Clinical impression: That gives you a Centor score of four, which makes bacterial infection likely rather than viral.",
+      "plan": "Plan: I will start you on phenoxymethylpenicillin, two hundred and fifty milligrams four times a day for ten days. Finish the whole course even when you feel better. Take paracetamol for the pain and drink plenty of fluids. If you develop difficulty breathing, or you cannot swallow your own saliva, that is an emergency and you should be seen straight away."
+    },
+    "4": {
+      "subjective": "Patient reports: That's right. It's been about three months since the last one. Honestly, mixed. I've been taking the metformin every day, but my sugars are still higher than I'd like in the mornings. I've been checking most days. Usually around eight or nine before breakfast. In the evenings it's better, maybe six or seven. I've been trying to walk more, about twenty minutes most days, but work has been busy and I've missed some days. My weight is about the same as last time. No, nothing like that. A bit of tingling in my toes at night sometimes. Not that I've noticed. Alright.",
+      "objective": "Clinician noted: Your blood pressure today is one thirty two over eighty four. Weight is unchanged at eighty six kilograms. Your HbA1c has come back at fifty eight millimoles per mole, which is slightly above target. Foot examination shows intact pulses and normal sensation to monofilament testing on both feet, so the tingling is not showing up as measurable nerve damage yet.",
+      "assessment": "Clinical impression: Overall this is type two diabetes with suboptimal glycaemic control, and some early neuropathic symptoms that are not yet confirmed on examination.",
+      "plan": "Plan: I am going to increase your metformin to one gram twice daily. Please continue monitoring your morning readings and bring the record next time. I will refer you for retinal screening, which is due, and I would like repeat bloods in three months. If the tingling in your feet gets worse or spreads, let me know sooner rather than waiting. Focus on the morning readings first. I will book you in with the diabetes nurse to go through evening meals, since that is what usually drives the fasting numbers."
+    }
+  },
+  "expected": {
+    "1": [
+      {
+        "label": "X",
+        "sentence": "Good morning."
+      },
+      {
+        "label": "X",
+        "sentence": "Please take a seat."
+      },
+      {
+        "label": "X",
+        "sentence": "What brings you in today?"
+      },
+      {
+        "label": "X",
+        "sentence": "Can you describe the pain for me?"
+      },
+      {
+        "label": "X",
+        "sentence": "Have you felt sick at all, or been vomiting?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any changes to your vision?"
+      },
+      {
+        "label": "X",
+        "sentence": "Blurring, or flashing lights?"
+      },
+      {
+        "label": "X",
+        "sentence": "Have you had headaches like this before?"
+      },
+      {
+        "label": "X",
+        "sentence": "Are you taking any medication at the moment?"
+      },
+      {
+        "label": "X",
+        "sentence": "Let me check your blood pressure."
+      },
+      {
+        "label": "O",
+        "sentence": "Your blood pressure is one forty over ninety, which is elevated."
+      },
+      {
+        "label": "O",
+        "sentence": "Pupils are equal and reactive."
+      },
+      {
+        "label": "O",
+        "sentence": "No neck stiffness."
+      },
+      {
+        "label": "A",
+        "sentence": "This looks like migraine with aura, and your blood pressure is higher than I would like."
+      },
+      {
+        "label": "P",
+        "sentence": "I am going to prescribe sumatriptan fifty milligrams for the attacks."
+      },
+      {
+        "label": "P",
+        "sentence": "Keep a headache diary for two weeks."
+      },
+      {
+        "label": "P",
+        "sentence": "Come back in two weeks so we can recheck your blood pressure."
+      },
+      {
+        "label": "P",
+        "sentence": "If the pain becomes suddenly severe, or you develop weakness or confusion, go to the emergency department immediately."
+      }
+    ],
+    "2": [
+      {
+        "label": "X",
+        "sentence": "Hello, come in."
+      },
+      {
+        "label": "X",
+        "sentence": "What happened?"
+      },
+      {
+        "label": "X",
+        "sentence": "Which ankle?"
+      },
+      {
+        "label": "X",
+        "sentence": "Could you walk on it afterwards?"
+      },
+      {
+        "label": "X",
+        "sentence": "Did you hear a pop or a crack at the time?"
+      },
+      {
+        "label": "X",
+        "sentence": "Have you put anything on it?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any previous injuries to that ankle?"
+      },
+      {
+        "label": "X",
+        "sentence": "Let me have a look."
+      },
+      {
+        "label": "O",
+        "sentence": "There is swelling over the lateral malleolus and tenderness on the outer side."
+      },
+      {
+        "label": "O",
+        "sentence": "No bony tenderness at the posterior edge."
+      },
+      {
+        "label": "O",
+        "sentence": "You can bear weight, just about."
+      },
+      {
+        "label": "O",
+        "sentence": "Range of motion is reduced by pain."
+      },
+      {
+        "label": "A",
+        "sentence": "This is a lateral ankle sprain, grade two."
+      },
+      {
+        "label": "A",
+        "sentence": "I do not think it is fractured, and by the Ottawa rules you do not need an X-ray."
+      },
+      {
+        "label": "P",
+        "sentence": "Rest, ice, compression and elevation for the next three days."
+      },
+      {
+        "label": "P",
+        "sentence": "Take ibuprofen four hundred milligrams three times daily with food."
+      },
+      {
+        "label": "P",
+        "sentence": "Start gentle movement after day three."
+      },
+      {
+        "label": "P",
+        "sentence": "If you still cannot bear weight in a week, come back and we will arrange imaging."
+      },
+      {
+        "label": "P",
+        "sentence": "Realistically four to six weeks, and only after you can hop on it without pain."
+      }
+    ],
+    "3": [
+      {
+        "label": "X",
+        "sentence": "Hi there."
+      },
+      {
+        "label": "X",
+        "sentence": "What can I do for you?"
+      },
+      {
+        "label": "X",
+        "sentence": "Have you had a fever?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any cough?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any swelling in your neck, or tenderness?"
+      },
+      {
+        "label": "X",
+        "sentence": "Anyone at home or at work unwell?"
+      },
+      {
+        "label": "X",
+        "sentence": "Let me examine you."
+      },
+      {
+        "label": "O",
+        "sentence": "Temperature is thirty eight point two."
+      },
+      {
+        "label": "O",
+        "sentence": "The tonsils are enlarged with white exudate on both sides."
+      },
+      {
+        "label": "O",
+        "sentence": "There is tender cervical lymphadenopathy."
+      },
+      {
+        "label": "O",
+        "sentence": "No cough reported."
+      },
+      {
+        "label": "A",
+        "sentence": "That gives you a Centor score of four, which makes bacterial infection likely rather than viral."
+      },
+      {
+        "label": "P",
+        "sentence": "I will start you on phenoxymethylpenicillin, two hundred and fifty milligrams four times a day for ten days."
+      },
+      {
+        "label": "P",
+        "sentence": "Finish the whole course even when you feel better."
+      },
+      {
+        "label": "P",
+        "sentence": "Take paracetamol for the pain and drink plenty of fluids."
+      },
+      {
+        "label": "P",
+        "sentence": "If you develop difficulty breathing, or you cannot swallow your own saliva, that is an emergency and you should be seen straight away."
+      }
+    ],
+    "4": [
+      {
+        "label": "X",
+        "sentence": "Good afternoon."
+      },
+      {
+        "label": "X",
+        "sentence": "This is your three-month diabetes review, isn't it?"
+      },
+      {
+        "label": "X",
+        "sentence": "How have things been going?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any hypos?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any episodes of feeling shaky, sweaty, confused?"
+      },
+      {
+        "label": "X",
+        "sentence": "How about your feet?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any numbness or tingling?"
+      },
+      {
+        "label": "X",
+        "sentence": "Any changes to your vision?"
+      },
+      {
+        "label": "X",
+        "sentence": "Let me examine you and go through your results."
+      },
+      {
+        "label": "O",
+        "sentence": "Your blood pressure today is one thirty two over eighty four."
+      },
+      {
+        "label": "O",
+        "sentence": "Weight is unchanged at eighty six kilograms."
+      },
+      {
+        "label": "O",
+        "sentence": "Your HbA1c has come back at fifty eight millimoles per mole, which is slightly above target."
+      },
+      {
+        "label": "O",
+        "sentence": "Foot examination shows intact pulses and normal sensation to monofilament testing on both feet, so the tingling is not showing up as measurable nerve damage yet."
+      },
+      {
+        "label": "A",
+        "sentence": "Overall this is type two diabetes with suboptimal glycaemic control, and some early neuropathic symptoms that are not yet confirmed on examination."
+      },
+      {
+        "label": "P",
+        "sentence": "I am going to increase your metformin to one gram twice daily."
+      },
+      {
+        "label": "P",
+        "sentence": "Please continue monitoring your morning readings and bring the record next time."
+      },
+      {
+        "label": "P",
+        "sentence": "I will refer you for retinal screening, which is due, and I would like repeat bloods in three months."
+      },
+      {
+        "label": "P",
+        "sentence": "If the tingling in your feet gets worse or spreads, let me know sooner rather than waiting."
+      },
+      {
+        "label": "P",
+        "sentence": "Focus on the morning readings first."
+      },
+      {
+        "label": "P",
+        "sentence": "I will book you in with the diabetes nurse to go through evening meals, since that is what usually drives the fasting numbers."
+      }
+    ]
+  }
+}
