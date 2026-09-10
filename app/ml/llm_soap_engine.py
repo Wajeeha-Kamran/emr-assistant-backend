@@ -48,6 +48,21 @@ SECTION_BRIEF = {
     "plan": "the treatment, prescriptions and follow-up",
 }
 
+# Bumped whenever the prompt text changes, because a prompt change invalidates
+# every previous score. v1 results are not comparable with v2 results.
+#
+# v1 -> v2 (10 Sep 2026): added the prohibition on unstated negatives.
+#   Under v1, MedGemma 4B wrote "The patient denies any other symptoms" and
+#   Mistral 7B wrote "The patient denies any history of fractures or
+#   dislocations" -- both in script 2's Subjective, both with zero overlap
+#   against anything in the consultation. Two unrelated model families
+#   producing the same class of fabrication in the same place is a property of
+#   the instruction, not of either model: "write a clinical paragraph" invites
+#   clinical-note convention, and pertinent negatives are convention. v1
+#   forbade adding findings but never said that "no X" and "denies X" are
+#   themselves findings.
+PROMPT_VERSION = "v2"
+
 PROMPT = """You are helping a doctor write the {section} section of a SOAP note.
 
 The {section} section records {brief}.
@@ -59,6 +74,9 @@ Rules:
 - Use ONLY the information in the sentences below.
 - Do not add any finding, diagnosis, drug, dose or measurement that is not there.
 - Do not infer or expand. If a detail is absent, leave it absent.
+- Do not state that anything was denied, normal, absent, unremarkable or not
+  present unless the sentences below say so. An absence is a clinical finding
+  and inventing one is the same as inventing a symptom.
 - Keep every number, dose and unit exactly as written.
 - Write in the third person, in the style of a clinical note.
 - Reply with the paragraph only, no preamble and no headings.
