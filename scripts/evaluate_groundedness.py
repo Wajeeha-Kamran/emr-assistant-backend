@@ -328,6 +328,13 @@ def polarity_review(source_sentences: List[str], note_text: str) -> List[Dict]:
         if not cues:
             continue
         words_here = set(content_words(sent))
+        if not words_here:
+            # "No." and similar carry no clinical content, so there is nothing
+            # for the source to support. Scoring them 0.0 marked them as
+            # fabrications: on the Kaggle control the extractive renderer --
+            # which cannot invent, by construction -- was reported with 57
+            # unsupported sentences, every one of them a fragment like "No".
+            continue
         best, best_overlap = "", 0.0
         for src in source_sentences:
             sw = set(content_words(src))
