@@ -108,6 +108,10 @@ class LLMSoapEngine:
                 "for the candidate models."
             )
         self.max_new_tokens = int(getattr(settings, "LLM_MAX_NEW_TOKENS", 220))
+        self.gate_enabled = bool(getattr(settings, "LLM_GROUNDING_GATE", True))
+        from app.ml.grounding import DEFAULT_THRESHOLD
+        self.gate_threshold = float(
+            getattr(settings, "LLM_GROUNDING_THRESHOLD", DEFAULT_THRESHOLD))
 
         try:
             import torch
@@ -160,7 +164,8 @@ class LLMSoapEngine:
                 out[name] = FALLBACK_TEXT
                 continue
             try:
-                out[name] = self._rewrite(name, picked)
+                text = self._rewrite(name, picked)
+                out[name] = self._gate(name, picked, text)
             except Exception as e:
                 # One section failing must not lose the note. Fall back to the
                 # verbatim rendering for that section only, and say so in the
@@ -172,6 +177,49 @@ class LLMSoapEngine:
                 from app.services.soap_service import SOAPService
                 out[name] = SOAPService.render_extractive({name: picked})[name]
         return out
+
+    def _gate(self, section: str, sentences: List[str], text: str) -> str:
+        """
+        Reject a section the transcript does not support.
+
+        A sentence with no clinical content in common with the source is not a
+        paraphrase, it is an invention. Measured under prompt v2, which
+        explicitly forbids exactly this:
+
+            MedGemma 4B  "The patient denies any other symptoms."
+            Mistral 7B   "The patient denies any history of fractures or
+                          dislocations."
+
+        Both scored 0.00. The instruction did not stop either model, so the
+        check does.
+
+        WHY THE WHOLE SECTION FALLS BACK RATHER THAN DROPPING THE SENTENCE:
+        dropping is the tempting fix and it is the wrong one. If the check ever
+        misfires, dropping deletes real clinical content from a medical record
+        and nothing downstream can tell. Falling back to the verbatim rendering
+        can only cost prose style, because that rendering is always complete
+        and always faithful. The failure modes are not symmetric and the design
+        should not pretend they are.
+        """
+        if not getattr(self, "gate_enabled", True):
+            return text
+
+        from app.ml.grounding import unsupported_sentences
+        bad = unsupported_sentences(text, sentences, self.gate_threshold)
+        if not bad:
+            return text
+
+        for sentence, score in bad:
+            logger.warning(
+                "Grounding gate rejected %s: support %.2f, no source for %r",
+                section, score, sentence[:120],
+            )
+        logger.warning(
+            "Section %s falls back to the verbatim rendering (%d unsupported "
+            "sentence(s)).", section, len(bad),
+        )
+        from app.services.soap_service import SOAPService
+        return SOAPService.render_extractive({section: sentences})[section]
 
     def _rewrite(self, section: str, sentences: List[str]) -> str:
         prompt = PROMPT.format(

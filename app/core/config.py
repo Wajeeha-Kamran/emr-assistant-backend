@@ -58,6 +58,14 @@ class Settings(BaseSettings):
     LLM_MODEL_ID: str = ""
     LLM_MAX_NEW_TOKENS: int = 220
 
+    # Reject any generated sentence the transcript does not support, and fall
+    # back to the verbatim rendering for that section. On by default: under
+    # prompt v2, which explicitly forbids it, MedGemma 4B and Mistral 7B each
+    # still invented a pertinent negative the patient never gave. See
+    # app/ml/grounding.py.
+    LLM_GROUNDING_GATE: bool = True
+    LLM_GROUNDING_THRESHOLD: float = 0.5
+
     NLP_TIMEOUT_SECONDS: int = 30
     
     # ASR is slower than real-time on CPU, and supports 30-minute recordings. 
