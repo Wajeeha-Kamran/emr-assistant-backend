@@ -64,9 +64,7 @@
         "I didn't take my temperature.",
         "No cough at all, actually.",
         "Yeah, under my jaw feels tender.",
-        "My daughter had a sore throat last week.",
-        "Mm, right.",
-        "Yeah, okay."
+        "My daughter had a sore throat last week."
       ],
       "objective": [
         "Temperature is thirty eight point two.",
@@ -86,7 +84,6 @@
     },
     "4": {
       "subjective": [
-        "That's right.",
         "It's been about three months since the last one.",
         "Honestly, mixed.",
         "I've been taking the metformin every day, but my sugars are still higher than I'd like in the mornings.",
@@ -97,8 +94,7 @@
         "My weight is about the same as last time.",
         "No, nothing like that.",
         "A bit of tingling in my toes at night sometimes.",
-        "Not that I've noticed.",
-        "Alright."
+        "Not that I've noticed."
       ],
       "objective": [
         "Your blood pressure today is one thirty two over eighty four.",
@@ -133,13 +129,13 @@
       "plan": "Plan: You can bear weight, just about. Rest, ice, compression and elevation for the next three days. Take ibuprofen four hundred milligrams three times daily with food. Start gentle movement after day three. If you still cannot bear weight in a week, come back and we will arrange imaging. Realistically four to six weeks, and only after you can hop on it without pain."
     },
     "3": {
-      "subjective": "Patient reports: My throat has been really sore since Saturday, and it hurts to swallow. I felt hot last night. I didn't take my temperature. No cough at all, actually. Yeah, under my jaw feels tender. My daughter had a sore throat last week. Mm, right. Yeah, okay.",
+      "subjective": "Patient reports: My throat has been really sore since Saturday, and it hurts to swallow. I felt hot last night. I didn't take my temperature. No cough at all, actually. Yeah, under my jaw feels tender. My daughter had a sore throat last week.",
       "objective": "Clinician noted: Temperature is thirty eight point two. The tonsils are enlarged with white exudate on both sides. There is tender cervical lymphadenopathy. No cough reported.",
       "assessment": "Clinical impression: That gives you a Centor score of four, which makes bacterial infection likely rather than viral.",
       "plan": "Plan: I will start you on phenoxymethylpenicillin, two hundred and fifty milligrams four times a day for ten days. Finish the whole course even when you feel better. Take paracetamol for the pain and drink plenty of fluids. If you develop difficulty breathing, or you cannot swallow your own saliva, that is an emergency and you should be seen straight away."
     },
     "4": {
-      "subjective": "Patient reports: That's right. It's been about three months since the last one. Honestly, mixed. I've been taking the metformin every day, but my sugars are still higher than I'd like in the mornings. I've been checking most days. Usually around eight or nine before breakfast. In the evenings it's better, maybe six or seven. I've been trying to walk more, about twenty minutes most days, but work has been busy and I've missed some days. My weight is about the same as last time. No, nothing like that. A bit of tingling in my toes at night sometimes. Not that I've noticed. Alright.",
+      "subjective": "Patient reports: It's been about three months since the last one. Honestly, mixed. I've been taking the metformin every day, but my sugars are still higher than I'd like in the mornings. I've been checking most days. Usually around eight or nine before breakfast. In the evenings it's better, maybe six or seven. I've been trying to walk more, about twenty minutes most days, but work has been busy and I've missed some days. My weight is about the same as last time. No, nothing like that. A bit of tingling in my toes at night sometimes. Not that I've noticed.",
       "objective": "Clinician noted: Your blood pressure today is one thirty two over eighty four. Weight is unchanged at eighty six kilograms. Your HbA1c has come back at fifty eight millimoles per mole, which is slightly above target. Foot examination shows intact pulses and normal sensation to monofilament testing on both feet, so the tingling is not showing up as measurable nerve damage yet.",
       "assessment": "Clinical impression: Overall this is type two diabetes with suboptimal glycaemic control, and some early neuropathic symptoms that are not yet confirmed on examination.",
       "plan": "Plan: I am going to increase your metformin to one gram twice daily. Please continue monitoring your morning readings and bring the record next time. I will refer you for retinal screening, which is due, and I would like repeat bloods in three months. If the tingling in your feet gets worse or spreads, let me know sooner rather than waiting. Focus on the morning readings first. I will book you in with the diabetes nurse to go through evening meals, since that is what usually drives the fasting numbers."

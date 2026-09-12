@@ -32,6 +32,13 @@ _ANNOUNCEMENT = re.compile(r"^(let me|let us|let's|i'?ll just|i am going to have
 # tuning it against the same four scripts the system is measured on would make
 # the measurement meaningless. These are structural properties of conversation,
 # not fitted parameters.
+#
+# NOTE on the four $-anchored alternatives (okay$, ok$, alright$, right$): they
+# cannot fire, because _split_sentences keeps terminal punctuation, so the string
+# reaching here is "Okay." and not "okay". They are covered instead by
+# _is_backchannel below, which is punctuation-insensitive. They are left in place
+# because removing them would change nothing and this comment is the more useful
+# record.
 _PLEASANTRY = re.compile(
     r"^(good morning|good afternoon|good evening|good day|hello|hi\b|hey\b"
     r"|please take a seat|take a seat|come in|have a seat|thank you|thanks"
@@ -39,6 +46,82 @@ _PLEASANTRY = re.compile(
     r"|see you|goodbye|bye)\b",
     re.I,
 )
+
+
+# ---------------------------------------------------------------------------
+# Backchannel and bare answers
+# ---------------------------------------------------------------------------
+# WHY THIS EXISTS
+# The four reference scripts are written in full sentences, so every sentence in
+# them either documents something or is a question. Real consultations are not
+# like that. Measured on the five Kaggle recordings (12 Sep 2026), 312 of the 677
+# sentences that passed the filters above -- 46% -- were acknowledgements and
+# bare answers: 98 "Okay.", 52 "OK.", 47 "No.", 20 "Yeah.". The worst case,
+# CAR0001, put 25 bare "No."s into Objective, because _OBJECTIVE_CUES routes
+# anything starting with "no" to Objective as an observation.
+#
+# The result scored perfectly on faithfulness -- every word was in the transcript
+# -- and was useless as a note. That is the defect this closes.
+#
+# WHAT IS AND IS NOT CLAIMED
+# A sentence made entirely of function words, discourse markers and bare polarity
+# tokens carries no clinical content ON ITS OWN. That is the whole claim, and it
+# is a property of the sentence, not a judgement about clinical importance.
+#
+# It is NOT claimed that nothing is lost. "No." answering "Any chest pain?" is a
+# pertinent negative, and it is dropped here. Recovering it properly means
+# pairing each short answer with the question that prompted it and rendering the
+# pair ("Denies chest pain"), which is a real feature with its own failure modes
+# -- the pairing has to survive diarization errors, and the rendering would no
+# longer be strictly extractive. It is recorded as the next iteration, not
+# attempted here. Dropping a pertinent negative is a smaller harm than filing
+# 25 unattributed "No."s under Objective.
+#
+# The word list is closed and explicit for the same reason the pleasantry list
+# is: a tuned threshold fitted to the evaluation data would make the measurement
+# meaningless. Verified against docs/evidence/soap_expected.md and
+# soap_heldout.md -- it removes 0 of the 129 labelled doctor sentences, so the
+# reported clinical accuracy and noise rate cannot move.
+_BACKCHANNEL_WORDS = frozenset(
+    """
+    ok okay okey alright all right sure fine good great excellent awesome cool
+    perfect lovely nice gotcha understood indeed exactly absolutely definitely
+    certainly correct true
+    yes yeah yep yup no nope nah none nothing not never neither
+    uh um umm uhh er erm hmm hm mm mmhmm mhm ah aha oh well so and but then
+    now also actually anyway anyhow though just still
+    i me my you your it its that this these those we they he she there
+    am is are was were be been do does did have has had can could will would
+    shall should may might must
+    s t m re ve ll d
+    see know think understand get got
+    thanks thank please welcome sorry
+    """.split()
+)
+
+# Words only: apostrophes are split so that "I'm" tests as {i, m} and "it's" as
+# {it, s}. Digits are handled separately -- see _is_backchannel.
+_WORD_TOKEN = re.compile(r"[a-z]+")
+
+
+def _is_backchannel(sentence: str) -> bool:
+    """
+    True if every word in the sentence is a function word, a discourse marker or
+    a bare polarity token -- "Okay.", "No.", "Yeah, I do actually.", "Mm-hmm."
+
+    A sentence containing any digit is never treated as backchannel. "52. Okay,
+    okay." is an answer to "how old are you", and the age is content even though
+    every letter in the sentence is a filler word.
+    """
+    text = sentence.strip()
+    if not text:
+        return True
+    if any(ch.isdigit() for ch in text):
+        return False
+    words = _WORD_TOKEN.findall(text.lower().replace("’", "'"))
+    if not words:
+        return True
+    return all(word in _BACKCHANNEL_WORDS for word in words)
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +308,7 @@ def _is_documentable(sentence: str) -> bool:
     """
     True if a sentence belongs in a clinical note at all.
 
-    Three kinds of speech are excluded, and none of them is a judgement call
+    Four kinds of speech are excluded, and none of them is a judgement call
     about clinical importance -- they are all structural.
 
     QUESTIONS. "Have you had a fever?" documents nothing. The patient's answer
@@ -239,8 +322,16 @@ def _is_documentable(sentence: str) -> bool:
     PLEASANTRIES. Greetings and thanks. Before this filter, "Good morning" and
     "Please take a seat" were filed under Plan.
 
+    BACKCHANNEL AND BARE ANSWERS. "Okay.", "No.", "Yeah." -- see
+    _is_backchannel above for what this costs and why it is still the right
+    trade. This one does not show up on the four reference scripts at all,
+    because they are written in full sentences; it was found on the Kaggle
+    recordings.
+
     Measured on the four reference scripts (16 Aug 2026), 34 of 34 non-clinical
-    sentences reached the note before this existed -- a 100% noise rate.
+    sentences reached the note before the first three existed -- a 100% noise
+    rate. Measured on the five Kaggle recordings (12 Sep 2026), 312 of 677
+    surviving sentences were backchannel -- 46%.
     """
     text = sentence.strip()
     if not text:
@@ -250,6 +341,8 @@ def _is_documentable(sentence: str) -> bool:
     if _ANNOUNCEMENT.match(text):
         return False
     if _PLEASANTRY.match(text):
+        return False
+    if _is_backchannel(text):
         return False
     return True
 

@@ -125,6 +125,67 @@ failing is exactly the fitting this section is about, and the cost — one ambig
 observation misfiled — is far lower than the cost of a rule set quietly shaped to its
 own test data.
 
+## What the reference sets did not catch — backchannel (12 Sep 2026)
+
+The caveat above turned out to be the real one. Both labelled sets are written
+in full sentences, so every sentence in them is either clinical content or a
+question. Real speech is not like that.
+
+Run against the five Kaggle recordings — real consultations, real hesitation,
+real ASR damage — the filter let through **312 of the 677 sentences that reached
+it (46%)** that were nothing but acknowledgement:
+
+| | count |
+|---|---|
+| "Okay." | 98 |
+| "OK." | 52 |
+| "No." | 47 |
+| "Yeah." | 20 |
+| "All right." | 12 |
+| other backchannel (55 forms) | 83 |
+
+The worst case was CAR0001, whose Objective section was 26 sentences, 25 of them
+a bare "No.". `_OBJECTIVE_CUES` matches `^no\b` as an observation ("No neck
+stiffness"), so every bare denial was filed as an examination finding.
+
+That note scored **0.0% novel content and 0.0% omission** — perfect on every
+faithfulness metric the project has, and worthless as a clinical note. It is the
+clearest example so far of a measurement that was right about what it measured
+and silent about what mattered.
+
+**The fix.** `_is_backchannel` in `app/services/soap_service.py`: a sentence
+whose every word is a function word, discourse marker or bare polarity token is
+not documentable. Any sentence containing a digit is exempt, because "52. Okay,
+okay." answers "how old are you" and the age is content.
+
+| | before | after |
+|---|---|---|
+| Kaggle sentences reaching the note | 677 | 365 |
+| Labelled O/A/P sentences discarded | — | **0 of 129** |
+| Reference clinical accuracy | 97.4% | 97.4% (unchanged) |
+| Reference noise rate | 0% | 0% (unchanged) |
+
+The reference figures cannot move, and this is asserted by a test rather than
+observed: `tests/unit/test_documentable_filter.py` reads both labelled files and
+fails if any sentence labelled O, A or P is ever discarded. Without that test, a
+future tightening of this filter could improve the noise rate by throwing away
+findings and nothing would notice.
+
+**What this costs.** "No." answering "Any chest pain?" is a pertinent negative,
+and it is now dropped. Recovering it means pairing each short answer with the
+question that prompted it and rendering the pair ("Denies chest pain") — a real
+feature, with its own failure modes: the pairing has to survive diarization
+errors, and the rendering would no longer be strictly extractive. Recorded as
+the next iteration. Filing 25 unattributed "No."s under Objective is the larger
+harm.
+
+**What this does not fix.** The corrected Kaggle notes are still not good notes.
+Assessment is empty in four of the five, and Plan absorbs fragments that
+sentence-splitting cut mid-utterance ("when does it", "and how has your"). Those
+are separate defects — the encounters are mostly history-taking with no stated
+diagnosis, and real speech does not split cleanly on punctuation Whisper
+inserted. Neither is addressed here.
+
 ## Reproducing
 
 ```
