@@ -81,8 +81,9 @@ Sortformer itself is fine: 12 s for a 95 s consultation on this CPU, 0.13x
 realtime. The obstacle is packaging, not the model.
 
 Run this combination in the Colab notebook instead - see
-docs/evidence/combinations/README.md. NVIDIA's supported routes on Windows are
-WSL2 or a Linux container.
+scripts/combinations/README.md, "Why three of them need Colab", and
+notebooks/03_nemo_sortformer_parakeet.ipynb. NVIDIA's supported routes on
+Windows are WSL2 or a Linux container.
 """
 
 
