@@ -7,6 +7,55 @@ logger = logging.getLogger(__name__)
 
 FALLBACK_TEXT = "Not documented in dialogue."
 
+# What an empty section says, per section.
+#
+# WHY THESE EXIST
+# "Not documented in dialogue." is true of every empty section, and it tells
+# the reviewing doctor nothing useful. An empty Assessment can mean two very
+# different things:
+#
+#     the doctor never stated a diagnosis   -- normal in history-taking, and
+#                                              the doctor completes it at review
+#     the system failed to find one         -- a defect
+#
+# Measured on the five Kaggle recordings (13 Sep 2026), four of five had no
+# diagnosis anywhere in the doctor's speech: the consultations end before one
+# is given. Every doctor turn was searched. So the common case is the first
+# one, and the note should say so.
+#
+# WHAT EACH LINE MAY CLAIM
+# Only what the system can attest -- that it did not find anything. Not that
+# nothing was said. If the classifier misses a diagnosis that was spoken, "no
+# diagnosis was stated" would be a false assertion in a medical record, while
+# "none was identified" remains true.
+#
+# Nothing here is inferred from another section. Reading "prescribed
+# sumatriptan" in Plan and writing "migraine" into Assessment would be the
+# system inventing a diagnosis nobody spoke -- the same failure the grounding
+# gate in app/ml/grounding.py exists to prevent.
+SECTION_FALLBACKS = {
+    "subjective": "No patient-reported history was identified in this consultation.",
+    "objective": "No examination findings were identified in this consultation.",
+    "assessment": "No diagnostic statement was identified in this consultation.",
+    "plan": "No treatment or follow-up instructions were identified in this consultation.",
+}
+
+
+def fallback_for(section: str) -> str:
+    """The text an empty section carries. Unknown names get the generic line."""
+    return SECTION_FALLBACKS.get(section, FALLBACK_TEXT)
+
+
+# Every string this module can emit for an empty section.
+#
+# Callers asking "is this section empty?" must test membership here rather than
+# comparing against one literal. app/services/code_suggester.py compared against
+# FALLBACK_TEXT directly, so introducing a second fallback string would have made
+# an empty Assessment look like real clinical content and sent it to the ICD-10
+# search. FALLBACK_TEXT stays in the set so notes written before this change are
+# still recognised as empty.
+EMPTY_SECTION_TEXTS = frozenset([FALLBACK_TEXT, *SECTION_FALLBACKS.values()])
+
 # The lead-in each section's text carries. Kept here rather than inline so that
 # SOAPService.select_sections and any alternative renderer (see
 # app/ml/soap_engine.py) agree on them without duplicating string literals.
@@ -482,7 +531,7 @@ class SOAPService:
         result = {}
         for name, prefix in SECTION_PREFIXES.items():
             picked = sections.get(name) or []
-            result[name] = (prefix + _join(picked)) if picked else FALLBACK_TEXT
+            result[name] = (prefix + _join(picked)) if picked else fallback_for(name)
         return result
 
     @staticmethod

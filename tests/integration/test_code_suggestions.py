@@ -73,9 +73,15 @@ def test_generate_suggestions_empty_note(test_data):
     db_session.add(note)
     db_session.commit()
     
-    # Empty Assessment/Plan
+    # Empty Assessment/Plan. The Assessment carries the CURRENT per-section
+    # fallback rather than a literal, because that is the string the pipeline
+    # actually writes today; hard-coding one here is what let the emptiness
+    # check drift out of step with soap_service in the first place.
+    from app.services.soap_service import fallback_for
+
     db_session.add_all([
-        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.ASSESSMENT, content="Not documented in dialogue."),
+        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.ASSESSMENT,
+                    content=fallback_for("assessment")),
         SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.PLAN, content="   ")
     ])
     db_session.commit()
@@ -85,6 +91,35 @@ def test_generate_suggestions_empty_note(test_data):
     
     suggestions = db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).all()
     assert len(suggestions) == 0
+    assert db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).count() == 0
+
+
+def test_legacy_fallback_still_counts_as_empty(test_data):
+    """
+    Notes written before the per-section fallbacks carry the old generic line.
+    They must still be treated as empty, or an old note with no diagnosis would
+    start producing ICD-10 suggestions from the words "not documented".
+    """
+    db_session, test_doctor = test_data
+    session = ConsultationSession(doctor_id=test_doctor.id, status=SessionStatus.FINALIZED)
+    db_session.add(session)
+    db_session.commit()
+
+    note = SOAPNote(session_id=session.id, status=SOAPNoteStatus.DRAFT)
+    db_session.add(note)
+    db_session.commit()
+
+    db_session.add_all([
+        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.ASSESSMENT,
+                    content="Not documented in dialogue."),
+        SOAPSection(soap_note_id=note.id, section_type=SOAPSectionType.PLAN,
+                    content="Not documented in dialogue."),
+    ])
+    db_session.commit()
+
+    CodeSuggesterService.prepare_generation(note.id, db_session)
+    CodeSuggesterService.generate_in_background(note.id)
+
     assert db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).count() == 0
 
 def test_regenerate_draft_deletes_old_suggestions(test_data):

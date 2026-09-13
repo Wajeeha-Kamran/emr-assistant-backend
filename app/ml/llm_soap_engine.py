@@ -155,13 +155,13 @@ class LLMSoapEngine:
     # ------------------------------------------------------------------
 
     def render(self, sections: Dict[str, List[str]]) -> Dict[str, str]:
-        from app.services.soap_service import FALLBACK_TEXT
+        from app.services.soap_service import fallback_for
 
         out: Dict[str, str] = {}
         for name in ("subjective", "objective", "assessment", "plan"):
             picked = [s.strip() for s in (sections.get(name) or []) if s.strip()]
             if not picked:
-                out[name] = FALLBACK_TEXT
+                out[name] = fallback_for(name)
                 continue
             try:
                 text = self._rewrite(name, picked)

@@ -68,7 +68,12 @@ class CodeSuggesterService:
                     plan_text = section.content.strip()
 
             def is_empty(text: str) -> bool:
-                return not text or text == "Not documented in dialogue."
+                # Membership, not equality. soap_service emits a different
+                # sentence per empty section, and comparing against one literal
+                # would let an empty Assessment through to the ICD-10 search as
+                # though it were a diagnosis.
+                from app.services.soap_service import EMPTY_SECTION_TEXTS
+                return not text or text in EMPTY_SECTION_TEXTS
 
             ref_service = CodeReferenceService.get_instance()
             matches = []

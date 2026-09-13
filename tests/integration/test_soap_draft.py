@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 from unittest.mock import patch, MagicMock
 from app.ml.clinicalbert_engine import ClinicalBERTEngine, _cosine_similarity, SOAPGenerationError
-from app.services.soap_service import SOAPService, FALLBACK_TEXT
+from app.services.soap_service import SOAPService, FALLBACK_TEXT, fallback_for
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ def test_patient_segments_always_subjective():
     
     expected_subjective = "Patient reports: I have a headache. And some nausea!"
     assert result["subjective"] == expected_subjective
-    assert result["objective"] == "Not documented in dialogue."
+    assert result["objective"] == fallback_for("objective")
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ def test_doctor_segments_classified_into_three_categories(monkeypatch):
     assert result["objective"] == "Clinician noted: BP 120/80. Heart rate is normal."
     assert result["assessment"] == "Clinical impression: Tension headache."
     assert result["plan"] == "Plan: Take ibuprofen."
-    assert result["subjective"] == "Not documented in dialogue."
+    assert result["subjective"] == fallback_for("subjective")
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +147,11 @@ def test_doctor_segments_classified_into_three_categories(monkeypatch):
 
 def test_empty_sections_get_fallback(monkeypatch):
     """
-    Asserts empty sections receive 'Not documented in dialogue.' and do not crash.
+    Asserts empty sections receive their own fallback sentence and do not crash.
+
+    Each section says something different, because "Not documented in dialogue."
+    told the reviewing doctor nothing about WHY a section was empty. See
+    SECTION_FALLBACKS in app/services/soap_service.py.
     """
     mock_classified_docs = {
         "objective": [],
@@ -164,10 +168,16 @@ def test_empty_sections_get_fallback(monkeypatch):
     segments = [{"speaker_role": "DOCTOR", "text": "Dummy text"}]
     result = SOAPService.generate_draft(segments)
 
-    assert result["objective"] == "Not documented in dialogue."
-    assert result["assessment"] == "Not documented in dialogue."
-    assert result["plan"] == "Not documented in dialogue."
-    assert result["subjective"] == "Not documented in dialogue."
+    assert result["objective"] == fallback_for("objective")
+    assert result["assessment"] == fallback_for("assessment")
+    assert result["plan"] == fallback_for("plan")
+    assert result["subjective"] == fallback_for("subjective")
+
+    # The four must differ from one another, which is the whole point, and none
+    # may be the old generic line.
+    texts = [result[k] for k in ("subjective", "objective", "assessment", "plan")]
+    assert len(set(texts)) == 4
+    assert FALLBACK_TEXT not in texts
 
 
 # ---------------------------------------------------------------------------

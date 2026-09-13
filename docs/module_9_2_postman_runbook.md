@@ -73,7 +73,9 @@ docs\evidence\human_distinct\consult_1.wav
 This is the female-doctor / male-patient recording that scored 100% speaker
 accuracy. Using it means the resulting SOAP note has a properly populated
 Subjective section, drawn from real PATIENT speech, rather than the
-"Not documented in dialogue." fallback that appears when diarization fails.
+"No patient-reported history was identified in this consultation." fallback
+that appears when diarization fails. Each section has its own such line -- see
+SECTION_FALLBACKS in app/services/soap_service.py.
 
 Transcription takes a minute or two on CPU. That is expected and is documented in
 `docs/module_8_3_performance.md`.
