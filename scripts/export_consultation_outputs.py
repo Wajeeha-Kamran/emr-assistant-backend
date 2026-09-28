@@ -64,7 +64,7 @@ def fail(message):
 # Input preparation
 # ---------------------------------------------------------------------------
 
-def find_audio(audio_dir, limit):
+def find_audio(audio_dir, limit, names=None):
     if not os.path.isdir(audio_dir):
         fail(f"{audio_dir} is not a folder.")
 
@@ -74,6 +74,25 @@ def find_audio(audio_dir, limit):
     )
     if not files:
         fail(f"no audio files found under {audio_dir}")
+
+    # WHY --files EXISTS
+    # --limit takes the alphabetically first N, so it silently changes WHICH
+    # recordings are measured as soon as the folder gains a file. The Kaggle
+    # audio folder held one recording per specialty when kaggle_outputs.json
+    # was first produced (CAR0001, DER0001, GAS0001, MSK0001, RES0001); it
+    # later gained CAR0002..CAR0005, so "--limit 5" would have returned five
+    # cardiology consultations instead. The run would have looked fine and the
+    # numbers would not have been comparable with the previous ones.
+    #
+    # Name the recordings when the folder holds more than the set being
+    # measured. --files takes precedence over --limit.
+    if names:
+        wanted = [n.strip() for n in names if n.strip()]
+        by_name = {os.path.basename(p).lower(): p for p in files}
+        missing = [n for n in wanted if n.lower() not in by_name]
+        if missing:
+            fail("not found under {}: {}".format(audio_dir, ", ".join(missing)))
+        return [by_name[n.lower()] for n in wanted]
 
     if limit:
         files = files[:limit]
@@ -244,11 +263,19 @@ def main():
     parser.add_argument("--out", default="consultation_outputs.json",
                         help="where to write the results")
     parser.add_argument("--limit", type=int, default=0,
-                        help="process at most this many files (0 = all)")
+                        help="process at most this many files (0 = all). Takes "
+                             "the alphabetically first N, so prefer --files "
+                             "when the folder holds more than you are measuring")
+    parser.add_argument("--files", nargs="+", metavar="NAME", default=None,
+                        help="process exactly these file names, e.g. "
+                             "--files CAR0001.mp3 DER0001.mp3. Overrides --limit "
+                             "and fails loudly if any name is missing")
     args = parser.parse_args()
 
-    audio_files = find_audio(args.audio_dir, args.limit)
+    audio_files = find_audio(args.audio_dir, args.limit, args.files)
     print(f"{len(audio_files)} recordings to process from {args.audio_dir}")
+    for p in audio_files:
+        print(f"   {os.path.basename(p)}")
 
     work_dir = os.path.join("scratch", "converted_audio")
     results = []
