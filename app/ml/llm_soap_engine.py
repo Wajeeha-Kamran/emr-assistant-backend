@@ -87,6 +87,39 @@ Sentences:
 Paragraph:"""
 
 
+def _compute_dtype(preference: str = "auto"):
+    """
+    Pick the load precision. NEVER float16.
+
+    MEASURED 11 Sep 2026: loading Gemma in float16 makes its logits NaN, so
+    argmax returns token 0 and the model emits nothing but padding. MedGemma
+    scored 0.0% on its first run for exactly this reason, and the failure reads
+    like the model being bad at the task rather than a numerical fault. The
+    Colab notebook was fixed at the time; this engine was not, because nothing
+    had ever run it.
+
+    bfloat16 has the same exponent range as float32, so it does not overflow
+    the way float16 does, and it halves memory against float32 — which matters
+    on CPU, where a 4B model is about 16 GB in float32 and 8 GB in bfloat16.
+
+    Override with LLM_DTYPE = auto | bfloat16 | float32.
+    """
+    import torch
+
+    choice = (preference or "auto").strip().lower()
+    if choice == "bfloat16":
+        return torch.bfloat16
+    if choice == "float32":
+        return torch.float32
+    if choice not in ("", "auto"):
+        logger.warning("Unknown LLM_DTYPE %r; using auto.", preference)
+
+    if torch.cuda.is_available():
+        supported = getattr(torch.cuda, "is_bf16_supported", lambda: False)()
+        return torch.bfloat16 if supported else torch.float32
+    return torch.bfloat16
+
+
 class LLMSoapEngineError(Exception):
     """Raised when the LLM renderer is unavailable or fails."""
 
@@ -122,12 +155,13 @@ class LLMSoapEngine:
             ) from e
 
         token = getattr(settings, "HF_TOKEN", "") or None
+        dtype = _compute_dtype(getattr(settings, "LLM_DTYPE", "auto"))
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(self.model_id, token=token)
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_id,
                 token=token,
-                dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+                dtype=dtype,
                 device_map="auto" if torch.cuda.is_available() else None,
             )
             self.model.eval()
@@ -136,6 +170,9 @@ class LLMSoapEngine:
                 f"Failed to load {self.model_id} ({type(e).__name__}: {e})."
             ) from e
 
+        self.dtype = dtype
+        self._assert_healthy()
+
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if self.device == "cpu":
             logger.warning(
@@ -143,6 +180,46 @@ class LLMSoapEngine:
                 "single-session latency budget is already missed at 36.5s."
             )
         logger.info("LLMSoapEngine loaded %s on %s", self.model_id, self.device)
+
+    def _assert_healthy(self) -> None:
+        """
+        Generate a few tokens and refuse to start if they are degenerate.
+
+        A model loaded at the wrong precision does not crash. It emits padding,
+        and every downstream metric reports it as a very bad model. That is how
+        MedGemma came to be recorded at 0.0% clinical accuracy on 11 Sep 2026
+        before the cause was found. A load-time check turns a silent wrong
+        answer into a loud failure, which the fallback chain then handles by
+        using the extractive renderer.
+        """
+        import torch
+
+        probe = "Rewrite this as one sentence: the patient reports a headache."
+        try:
+            inputs = self.tokenizer(probe, return_tensors="pt").to(self.model.device)
+            with _INFERENCE_LOCK, torch.no_grad():
+                out = self.model.generate(
+                    **inputs,
+                    max_new_tokens=8,
+                    do_sample=False,
+                    pad_token_id=self.tokenizer.eos_token_id,
+                )
+        except Exception as e:
+            raise LLMSoapEngineError(
+                f"{self.model_id} failed its load-time health check "
+                f"({type(e).__name__}: {e})."
+            ) from e
+
+        new_tokens = out[0][inputs["input_ids"].shape[-1]:]
+        text = self.tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
+        if not text:
+            raise LLMSoapEngineError(
+                f"{self.model_id} produced only padding at dtype {self.dtype}. "
+                "This is the float16 NaN fault, not a bad model. Set "
+                "LLM_DTYPE=float32 and retry."
+            )
+        logger.info("LLMSoapEngine health check passed (%s, %s): %r",
+                    self.model_id, self.dtype, text[:60])
 
     @classmethod
     def get_instance(cls) -> "LLMSoapEngine":

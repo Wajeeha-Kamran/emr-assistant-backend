@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     SOAP_ENGINE: str = "extractive"
     LLM_MODEL_ID: str = ""
     LLM_MAX_NEW_TOKENS: int = 220
+    # auto | bfloat16 | float32. NEVER float16: it makes Gemma's logits
+    # NaN, so the model emits only padding and every metric reports it as
+    # a very bad model rather than a broken load. auto picks bfloat16
+    # where it is supported and float32 otherwise.
+    LLM_DTYPE: str = "auto"
 
     # Reject any generated sentence the transcript does not support, and fall
     # back to the verbatim rendering for that section. On by default: under
