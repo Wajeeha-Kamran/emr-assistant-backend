@@ -70,12 +70,17 @@ def _ensure_env() -> None:
     Placeholders are filled in only where the variable is genuinely absent, so a
     real .env always wins.
     """
+    # ENCRYPTION_KEY is validated on load, so it cannot be arbitrary text: a
+    # Fernet key is exactly 32 bytes, base64url-encoded. The one below decodes
+    # to b"evaluation-only-not-a-real-key32". It encrypts nothing here -- this
+    # script never opens the database -- but it has to be well formed or the
+    # settings object refuses to build.
     placeholders = {
         "APP_ENV": "evaluation",
         "DATABASE_URL": "postgresql://unused/unused",
         "SIMULATED_EMR_URL": "http://localhost:8001",
         "JWT_SECRET": "unused-in-this-script",
-        "ENCRYPTION_KEY": "dGhpcy1rZXktaXMtbm90LXVzZWQtaW4tdGhpcy1zY3JpcHQ=",
+        "ENCRYPTION_KEY": "ZXZhbHVhdGlvbi1vbmx5LW5vdC1hLXJlYWwta2V5MzI=",
     }
     for key, value in placeholders.items():
         os.environ.setdefault(key, value)
