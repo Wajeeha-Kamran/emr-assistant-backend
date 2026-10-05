@@ -35,8 +35,11 @@ untouched because every word in it is sourced. That needs entailment. The
 polarity list in scripts/evaluate_groundedness.py exists for exactly that gap.
 """
 
+import logging
 import re
 from typing import Dict, List, Tuple
+
+logger = logging.getLogger(__name__)
 
 WORD_RE = re.compile(r"[a-z0-9]+(?:\.[0-9]+)?")
 SENTENCE_SPLIT = re.compile(r"(?<![0-9])([.!?]+)(?![0-9])\s+")
@@ -334,3 +337,76 @@ def unsupported_values(text: str, source_sentences: List[str]) -> List[str]:
     src_facts = {f for f in numeric_facts(" ".join(source_sentences))
                  if DIGITS_RE.match(str(f))}
     return sorted(note_facts - src_facts)
+
+
+# ---------------------------------------------------------------------------
+# The gate itself
+# ---------------------------------------------------------------------------
+# WHY THIS IS A FUNCTION AND NOT A METHOD
+# It used to live on LLMSoapEngine. A second renderer now exists
+# (app/ml/remote_soap_engine.py, which calls a model running in its own
+# process), and a gate that lives inside one renderer is a gate the other one
+# does not have. That is the same shape as the defect this file already
+# records: the numeric check existed, but in a script the deployed path never
+# ran, so a tenfold HbA1c error reached a note.
+#
+# Both renderers call this. There is one implementation, in the application
+# that owns the clinical record -- never in the model service, which could be
+# swapped, restarted or pointed somewhere else without the safety check
+# following it.
+
+def gate_section(section: str, sentences: List[str], text: str,
+                 threshold: float = 0.5) -> str:
+    """
+    Return TEXT if the source supports it, otherwise the verbatim rendering.
+
+    Two separate questions are asked, because a section can pass one and fail
+    the other. Values are checked FIRST: a wrong number is the failure that
+    reaches a patient, and it is precisely the one word overlap cannot see.
+
+    Measured under prompt v2, which explicitly forbids unstated negatives:
+
+        MedGemma 4B  "The patient denies any other symptoms."
+        Mistral 7B   "The patient denies any history of fractures or
+                      dislocations."
+
+    Both scored 0.00 against their source. The instruction did not stop either
+    model, so this does.
+
+    WHY THE WHOLE SECTION FALLS BACK RATHER THAN THE BAD SENTENCE BEING DROPPED
+    Dropping is the tempting fix and it is the wrong one. If the check ever
+    misfires, dropping deletes real clinical content from a medical record and
+    nothing downstream can tell. Falling back costs prose style and nothing
+    else, because the verbatim rendering is always complete and always
+    faithful. The two failure modes are not symmetric and the design should
+    not pretend they are.
+    """
+    from app.services.soap_service import SOAPService
+
+    bad_values = unsupported_values(text, sentences)
+    if bad_values:
+        for value in bad_values:
+            logger.warning(
+                "Grounding gate rejected %s: value %s appears nowhere in "
+                "the source.", section, value,
+            )
+        logger.warning(
+            "Section %s falls back to the verbatim rendering "
+            "(%d value(s) not in source).", section, len(bad_values),
+        )
+        return SOAPService.render_extractive({section: sentences})[section]
+
+    bad = unsupported_sentences(text, sentences, threshold)
+    if not bad:
+        return text
+
+    for sentence, score in bad:
+        logger.warning(
+            "Grounding gate rejected %s: support %.2f, no source for %r",
+            section, score, sentence[:120],
+        )
+    logger.warning(
+        "Section %s falls back to the verbatim rendering (%d unsupported "
+        "sentence(s)).", section, len(bad),
+    )
+    return SOAPService.render_extractive({section: sentences})[section]

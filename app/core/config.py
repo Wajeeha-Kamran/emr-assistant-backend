@@ -63,6 +63,23 @@ class Settings(BaseSettings):
     # where it is supported and float32 otherwise.
     LLM_DTYPE: str = "auto"
 
+    # "remote" = the same rewriting, but the model runs in its own process on
+    #            THIS machine (scripts/llm_service.py) instead of inside the
+    #            backend. MedGemma 4B needs ~8 GB and the backend already
+    #            holds Whisper and Sortformer on a 15.8 GB machine; loading
+    #            both in one process exhausted it.
+    #
+    # LLM_SERVICE_URL must stay on this machine. Project document 6.1 states
+    # that every model runs on the same machine as the backend and that no
+    # clinical text reaches a third party service, which is the supervisor's
+    # explicit instruction. A non-local address is logged as a warning on
+    # every start rather than silently accepted.
+    LLM_SERVICE_URL: str = "http://127.0.0.1:8002"
+    # A 4B model on CPU generates a few tokens a second, so a section can take
+    # minutes. This is a runaway guard, not a performance budget: when it
+    # fires, the note falls back to the verbatim text rather than failing.
+    LLM_SERVICE_TIMEOUT_SECONDS: float = 600.0
+
     # Reject any generated sentence the transcript does not support, and fall
     # back to the verbatim rendering for that section. On by default: under
     # prompt v2, which explicitly forbids it, MedGemma 4B and Mistral 7B each

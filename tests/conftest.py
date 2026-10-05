@@ -278,6 +278,7 @@ TRACEABILITY: Dict[str, Tuple[str, List[str]]] = {
         "integration/test_soap_draft.py",
         "unit/test_documentable_filter.py",
         "unit/test_grounding_gate.py",
+        "unit/test_remote_soap_engine.py",
         "integration/test_soap_notes.py::test_generate_and_save_draft_setup",
         "integration/test_soap_notes.py::test_generate_in_background_success",
         "integration/test_soap_notes.py::test_ownership_check",

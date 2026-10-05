@@ -84,8 +84,17 @@ def get_soap_engine() -> SOAPEngine:
     Returns the configured engine.
 
     SOAP_ENGINE=extractive  -- verbatim, cannot invent (default)
-    SOAP_ENGINE=llm         -- LLM rewrites the selected sentences as prose;
-                               requires LLM_MODEL_ID and transformers
+    SOAP_ENGINE=llm         -- LLM rewrites the selected sentences as prose,
+                               loaded INSIDE this process; requires
+                               LLM_MODEL_ID and transformers
+    SOAP_ENGINE=remote      -- the same rewriting, but the model runs in its
+                               own process on this machine; requires
+                               LLM_SERVICE_URL and scripts/llm_service.py
+                               to be running
+
+    On a machine that also runs Whisper and the diarizer, prefer "remote":
+    "llm" adds roughly 8 GB to the backend process and was what exhausted the
+    development machine. Both apply the same grounding gate, in this process.
     """
     global _ENGINE
     if _ENGINE is not None:
@@ -97,11 +106,18 @@ def get_soap_engine() -> SOAPEngine:
     if name == "llm":
         from app.ml.llm_soap_engine import LLMSoapEngine
         _ENGINE = LLMSoapEngine.get_instance()
+    elif name == "remote":
+        # Constructed eagerly, but it loads no model and opens no connection:
+        # it only reads settings. The backend must start whether or not the
+        # model service happens to be running.
+        from app.ml.remote_soap_engine import RemoteSoapEngine
+        _ENGINE = RemoteSoapEngine()
     elif name == "extractive":
         _ENGINE = ExtractiveEngine()
     else:
         raise SOAPEngineError(
-            f"Unknown SOAP_ENGINE {name!r}. Expected 'extractive' or 'llm'."
+            f"Unknown SOAP_ENGINE {name!r}. Expected 'extractive', 'llm' "
+            f"or 'remote'."
         )
 
     logger.info("SOAP engine: %s", name)

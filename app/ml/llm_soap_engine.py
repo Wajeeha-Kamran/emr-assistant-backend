@@ -257,64 +257,21 @@ class LLMSoapEngine:
 
     def _gate(self, section: str, sentences: List[str], text: str) -> str:
         """
-        Reject a section the transcript does not support.
+        Apply the grounding gate, unless it has been switched off.
 
-        A sentence with no clinical content in common with the source is not a
-        paraphrase, it is an invention. Measured under prompt v2, which
-        explicitly forbids exactly this:
+        The decision itself lives in app/ml/grounding.gate_section, because
+        the remote renderer needs exactly the same check and a gate that
+        exists in only one of two renderers is not a gate. See the comment
+        above that function.
 
-            MedGemma 4B  "The patient denies any other symptoms."
-            Mistral 7B   "The patient denies any history of fractures or
-                          dislocations."
-
-        Both scored 0.00. The instruction did not stop either model, so the
-        check does.
-
-        WHY THE WHOLE SECTION FALLS BACK RATHER THAN DROPPING THE SENTENCE:
-        dropping is the tempting fix and it is the wrong one. If the check ever
-        misfires, dropping deletes real clinical content from a medical record
-        and nothing downstream can tell. Falling back to the verbatim rendering
-        can only cost prose style, because that rendering is always complete
-        and always faithful. The failure modes are not symmetric and the design
-        should not pretend they are.
+        LLM_GROUNDING_GATE=false is a real off switch, used to measure what
+        the model produces without it. Nothing else should turn it off.
         """
         if not getattr(self, "gate_enabled", True):
             return text
 
-        from app.ml.grounding import unsupported_sentences, unsupported_values
-
-        # Two separate questions, because a sentence can pass one and fail the
-        # other. Values are checked FIRST: a wrong number is the failure that
-        # reaches a patient, and it is the one the word check cannot see.
-        bad_values = unsupported_values(text, sentences)
-        if bad_values:
-            for value in bad_values:
-                logger.warning(
-                    "Grounding gate rejected %s: value %s appears nowhere in "
-                    "the source.", section, value,
-                )
-            logger.warning(
-                "Section %s falls back to the verbatim rendering "
-                "(%d value(s) not in source).", section, len(bad_values),
-            )
-            from app.services.soap_service import SOAPService
-            return SOAPService.render_extractive({section: sentences})[section]
-
-        bad = unsupported_sentences(text, sentences, self.gate_threshold)
-        if not bad:
-            return text
-
-        for sentence, score in bad:
-            logger.warning(
-                "Grounding gate rejected %s: support %.2f, no source for %r",
-                section, score, sentence[:120],
-            )
-        logger.warning(
-            "Section %s falls back to the verbatim rendering (%d unsupported "
-            "sentence(s)).", section, len(bad),
-        )
-        from app.services.soap_service import SOAPService
-        return SOAPService.render_extractive({section: sentences})[section]
+        from app.ml.grounding import gate_section
+        return gate_section(section, sentences, text, self.gate_threshold)
 
     def _rewrite(self, section: str, sentences: List[str]) -> str:
         prompt = PROMPT.format(
