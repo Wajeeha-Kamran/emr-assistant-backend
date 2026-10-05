@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.code_reference import CodeReference, CodeType
 from app.ml.clinicalbert_engine import ClinicalBERTEngine
+from app.ml.laterality import contradicts
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,14 @@ class CodeReferenceService:
             score = self._cosine_similarity(text_emb, code_emb)
             scored_codes.append((code, score))
             
-        # Sort by similarity score descending
-        scored_codes.sort(key=lambda x: x[1], reverse=True)
-        
+        # Sort by similarity score descending, but never rank a code for the
+        # opposite side of the body above one that does not contradict the
+        # note. The embeddings cannot tell left from right -- see
+        # app/ml/laterality.py for the measurement. False sorts before True,
+        # and -score ascending is score descending, so the order inside each
+        # group is still the similarity order.
+        scored_codes.sort(
+            key=lambda pair: (contradicts(text, pair[0].description), -pair[1])
+        )
+
         return scored_codes[:top_k]

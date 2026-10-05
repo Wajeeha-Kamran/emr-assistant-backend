@@ -61,7 +61,27 @@ def test_generate_suggestions_success(test_data):
     # Check that they were persisted
     persisted = db_session.query(CodeSuggestion).filter_by(soap_note_id=note.id).order_by(CodeSuggestion.rank).all()
     assert len(persisted) == 10
-    assert persisted[0].code.startswith("S93.4")  # Matches ankle sprain variants
+    # TC-08 requires a ranked shortlist, not one correct answer -- the doctor
+    # picks from five. So the claims here are that the right code is ON the
+    # shortlist, and that nothing for the opposite leg is.
+    #
+    # This line used to read persisted[0].code.startswith("S93.4"). That was
+    # true on 10 Aug 2026, when the reference set held 30 codes and S93.4 was
+    # the only ankle entry. The set grew to 70 on 22 Aug and gained M25.571
+    # and M25.572, "pain in right/left ankle", which outscore the sprain code
+    # by 0.026. The test kept passing anyway, because the TEST database still
+    # held the old 30 rows; re-seeding it on 5 Oct 2026 failed it immediately.
+    # Six weeks of TC-08 evidence were produced against a smaller catalogue
+    # than the one the project documents.
+    persisted_icd10 = [s for s in persisted if s.code_type.value == "ICD10"]
+    assert any(s.code == "S93.401A" for s in persisted_icd10), (
+        "the right ankle sprain code is not on the shortlist: "
+        f"{[s.code for s in persisted_icd10]}")
+    # The note says right. The embeddings score the left code marginally
+    # higher (0.9022 against 0.9009), so without app/ml/laterality.py this
+    # suggests a code for the other leg.
+    wrong_side = [s.code for s in persisted_icd10 if "left" in s.description.lower()]
+    assert not wrong_side, f"codes for the other leg were suggested: {wrong_side}"
     
 def test_generate_suggestions_empty_note(test_data):
     db_session, test_doctor = test_data
