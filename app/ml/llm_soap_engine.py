@@ -281,7 +281,25 @@ class LLMSoapEngine:
         if not getattr(self, "gate_enabled", True):
             return text
 
-        from app.ml.grounding import unsupported_sentences
+        from app.ml.grounding import unsupported_sentences, unsupported_values
+
+        # Two separate questions, because a sentence can pass one and fail the
+        # other. Values are checked FIRST: a wrong number is the failure that
+        # reaches a patient, and it is the one the word check cannot see.
+        bad_values = unsupported_values(text, sentences)
+        if bad_values:
+            for value in bad_values:
+                logger.warning(
+                    "Grounding gate rejected %s: value %s appears nowhere in "
+                    "the source.", section, value,
+                )
+            logger.warning(
+                "Section %s falls back to the verbatim rendering "
+                "(%d value(s) not in source).", section, len(bad_values),
+            )
+            from app.services.soap_service import SOAPService
+            return SOAPService.render_extractive({section: sentences})[section]
+
         bad = unsupported_sentences(text, sentences, self.gate_threshold)
         if not bad:
             return text

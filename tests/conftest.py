@@ -277,6 +277,7 @@ TRACEABILITY: Dict[str, Tuple[str, List[str]]] = {
     "tc07": ("SOAP Draft Generated", [
         "integration/test_soap_draft.py",
         "unit/test_documentable_filter.py",
+        "unit/test_grounding_gate.py",
         "integration/test_soap_notes.py::test_generate_and_save_draft_setup",
         "integration/test_soap_notes.py::test_generate_in_background_success",
         "integration/test_soap_notes.py::test_ownership_check",
@@ -294,6 +295,7 @@ TRACEABILITY: Dict[str, Tuple[str, List[str]]] = {
     "tc08": ("Code Suggestions Displayed (Ranked)", [
         "integration/test_code_suggestions.py",
         "integration/test_code_suggestions_api.py",
+        "unit/test_laterality.py",
     ]),
     "tc09": ("Sync Success Update Status", [
         "integration/test_emr_sync.py::test_contract_validation",
