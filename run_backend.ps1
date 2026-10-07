@@ -18,6 +18,18 @@
   is what lets the mobile app connect. Windows Firewall will ask for permission
   the first time -- allow it on private networks.
 
+  THE USB CABLE
+  If an Android phone is plugged in, this script also runs
+
+      adb reverse tcp:8000 tcp:8000
+
+  which makes port 8000 on the phone the same port here, down the cable. The
+  app then uses http://127.0.0.1:8000 with no LAN address and no firewall rule.
+  That tunnel is cleared by unplugging, a phone reboot, or Visual Studio
+  starting its own adb server -- and the only symptom is an app that installs
+  and runs but cannot log in. Re-applying it here means it is set at the one
+  moment it is needed, so it cannot be the thing that is forgotten on the day.
+
   Usage:
       .\run_backend.ps1            start both services, reachable from your phone
       .\run_backend.ps1 -Local     bind to 127.0.0.1 only (this machine)
@@ -108,8 +120,52 @@ if (-not $ok) {
     exit 1
 }
 
-# The LAN address is what a physical phone needs. Print it so it does not have to
-# be looked up every time.
+# ------------------------------------------------- the phone, over the cable
+# Nothing here is allowed to stop the backend starting. A missing adb, a
+# mismatched adb, or no phone plugged in are all ordinary situations, not
+# errors: the backend is perfectly usable from this machine and the emulator
+# without any of it.
+function Find-Adb {
+    $candidates = @(
+        "adb",
+        "D:\platform-tools\adb.exe",
+        (Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"),
+        "C:\Program Files (x86)\Android\android-sdk\platform-tools\adb.exe"
+    )
+    foreach ($candidate in $candidates) {
+        $found = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($found) { return $found.Source }
+    }
+    return $null
+}
+
+$phoneReady = $false
+$adbFound = $false
+$phoneAttached = $false
+
+if (-not $Local) {
+    try {
+        $adb = Find-Adb
+        if ($adb) {
+            $adbFound = $true
+            # Lines read "R58T41H57ZN<tab>device". "unauthorized" (the prompt on
+            # the phone was never accepted) and "offline" are deliberately not
+            # matched -- a tunnel to either of those silently does nothing.
+            $attached = & $adb devices 2>$null |
+                Where-Object { $_ -match '^\S+\s+device$' }
+            if ($attached) {
+                $phoneAttached = $true
+                & $adb reverse tcp:8000 tcp:8000 2>$null | Out-Null
+                if ($LASTEXITCODE -eq 0) { $phoneReady = $true }
+            }
+        }
+    } catch {
+        # Deliberately swallowed. See the comment above this block.
+    }
+}
+
+# The LAN address is what a physical phone needs when the cable is not used.
+# Print it so it does not have to be looked up every time.
 $lan = (Get-NetIPAddress -AddressFamily IPv4 |
         Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' -and $_.PrefixOrigin -ne 'WellKnown' } |
         Select-Object -First 1).IPAddress
@@ -121,6 +177,18 @@ Write-Host "  This machine        http://127.0.0.1:8000"
 Write-Host "  API documentation   http://127.0.0.1:8000/docs"
 Write-Host "  Simulated EMR       http://127.0.0.1:8001/docs"
 if (-not $Local) {
+    Write-Host ""
+    if ($phoneReady) {
+        Write-Host "  Phone on the cable          http://127.0.0.1:8000  (adb reverse set)" -ForegroundColor Green
+    }
+    elseif ($adbFound -and -not $phoneAttached) {
+        Write-Host "  No phone detected on USB. Plug one in and re-run this script," -ForegroundColor DarkGray
+        Write-Host "  or set the tunnel by hand:  adb reverse tcp:8000 tcp:8000" -ForegroundColor DarkGray
+    }
+    elseif (-not $adbFound) {
+        Write-Host "  adb not found, so no USB tunnel was set. The emulator and the" -ForegroundColor DarkGray
+        Write-Host "  LAN address below still work." -ForegroundColor DarkGray
+    }
     Write-Host ""
     Write-Host "  From the Android emulator   http://10.0.2.2:8000"
     if ($lan) {
